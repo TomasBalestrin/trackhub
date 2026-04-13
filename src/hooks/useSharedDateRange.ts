@@ -24,20 +24,21 @@ function readStored(): DateRange | null {
  * sobreviva à navegação entre menus do admin.
  */
 export function useSharedDateRange(defaultField: DateField = "created_at") {
-  const [range, setRange] = useState<DateRange>(() => presetToRange("last_30d", defaultField));
-  const hydratedRef = useRef(false);
-
-  // Hidrata do localStorage no mount (evita mismatch SSR/CSR)
-  useEffect(() => {
+  // Lê localStorage SÍNCRONO no init para evitar render inicial com default
+  // e race entre hidratação e fetch dependente de dateRange.
+  const [range, setRange] = useState<DateRange>(() => {
     const stored = readStored();
-    if (stored) setRange(stored);
-    hydratedRef.current = true;
-  }, []);
+    return stored ?? presetToRange("last_30d", defaultField);
+  });
+  const isFirstRenderRef = useRef(true);
 
-  // Persiste a cada mudança — só depois de hidratar, para não sobrescrever
-  // o valor salvo com o default inicial.
+  // Persiste a cada mudança (pula o primeiro render para não regravar o
+  // valor que acabamos de ler do storage).
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(range));

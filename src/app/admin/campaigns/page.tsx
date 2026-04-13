@@ -126,12 +126,6 @@ const STATUS_FILTER_OPTIONS = [
   { value: "DELETED", label: "Desativadas" },
 ];
 
-const PERIOD_OPTIONS = [
-  { value: "last_7d", label: "7 dias" },
-  { value: "last_14d", label: "14 dias" },
-  { value: "last_30d", label: "30 dias" },
-];
-
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<CampaignGroup[]>([]);
   const [adsets, setAdsets] = useState<AdsetRow[]>([]);
@@ -143,7 +137,6 @@ export default function CampaignsPage() {
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [period, setPeriod] = useState("last_7d");
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [expandedAdset, setExpandedAdset] = useState<string | null>(null);
   const [dateRange, setDateRange] = useSharedDateRange();
@@ -151,11 +144,8 @@ export default function CampaignsPage() {
 
   useEffect(() => {
     loadData();
-  }, [dateRange]);
-
-  useEffect(() => {
     loadInsights();
-  }, [period]);
+  }, [dateRange.start, dateRange.end]);
 
   async function loadData() {
     const res = await fetch("/api/admin/campaigns");
@@ -272,10 +262,13 @@ export default function CampaignsPage() {
 
   async function loadInsights() {
     try {
+      const range = dateRange.start && dateRange.end
+        ? `since=${encodeURIComponent(dateRange.start)}&until=${encodeURIComponent(dateRange.end)}`
+        : "date_preset=last_30d";
       const [campaignRes, adsetRes, adRes] = await Promise.all([
-        fetch(`/api/admin/insights?type=campaigns&date_preset=${period}`),
-        fetch(`/api/admin/insights?type=adsets&date_preset=${period}`),
-        fetch(`/api/admin/insights?type=ads&date_preset=${period}`),
+        fetch(`/api/admin/insights?type=campaigns&${range}`),
+        fetch(`/api/admin/insights?type=adsets&${range}`),
+        fetch(`/api/admin/insights?type=ads&${range}`),
       ]);
       const campaignData = await campaignRes.json();
       const adsetData = await adsetRes.json();
@@ -365,7 +358,6 @@ export default function CampaignsPage() {
         </div>
         <div className="flex items-center gap-3">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
-          <Select options={PERIOD_OPTIONS} value={period} onChange={(e) => setPeriod(e.target.value)} />
           <button
             onClick={handleSync}
             disabled={syncing}

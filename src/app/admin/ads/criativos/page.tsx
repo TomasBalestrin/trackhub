@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
+import { useSharedDateRange } from "@/hooks/useSharedDateRange";
 
 interface AdInsight {
   ad_name: string;
@@ -37,12 +38,6 @@ interface InsightsResponse {
   };
 }
 
-const PERIOD_OPTIONS = [
-  { value: "last_7d", label: "7 dias" },
-  { value: "last_14d", label: "14 dias" },
-  { value: "last_30d", label: "30 dias" },
-] as const;
-
 function fmt(value: number, decimals = 2): string {
   return value.toLocaleString("pt-BR", {
     minimumFractionDigits: decimals,
@@ -52,7 +47,7 @@ function fmt(value: number, decimals = 2): string {
 
 
 export default function CriativosPage() {
-  const [period, setPeriod] = useState("last_7d");
+  const [dateRange, setDateRange] = useSharedDateRange();
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const { formatBRL } = useExchangeRate();
@@ -63,9 +58,10 @@ export default function CriativosPage() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(
-          `/api/admin/insights?type=ads&date_preset=${period}`
-        );
+        const range = dateRange.start && dateRange.end
+          ? `since=${encodeURIComponent(dateRange.start)}&until=${encodeURIComponent(dateRange.end)}`
+          : "date_preset=last_30d";
+        const res = await fetch(`/api/admin/insights?type=ads&${range}`);
         const json: InsightsResponse = await res.json();
         if (!cancelled) setData(json);
       } catch (err) {
@@ -79,7 +75,7 @@ export default function CriativosPage() {
     return () => {
       cancelled = true;
     };
-  }, [period]);
+  }, [dateRange.start, dateRange.end]);
 
   // Filter ads with at least 1 lead
   const adsWithLeads = (data?.data ?? []).filter((ad) => ad.leads > 0);
@@ -141,13 +137,7 @@ export default function CriativosPage() {
             Compare performance dos anuncios
           </p>
         </div>
-        <div className="w-48">
-          <Select
-            options={PERIOD_OPTIONS}
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-          />
-        </div>
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
 
       {/* Loading */}

@@ -328,11 +328,14 @@ export default function AlertasPage() {
   useEffect(() => {
     async function load() {
       try {
+        const range = dateRange.start && dateRange.end
+          ? `since=${encodeURIComponent(dateRange.start)}&until=${encodeURIComponent(dateRange.end)}`
+          : "date_preset=last_30d";
         const [dailyRes, campaignRes, leadsRes, hourlyRes] = await Promise.all([
-          fetch("/api/admin/insights?type=daily&date_preset=last_14d"),
-          fetch("/api/admin/insights?type=campaigns&date_preset=last_7d"),
+          fetch(`/api/admin/insights?type=daily&${range}`),
+          fetch(`/api/admin/insights?type=campaigns&${range}`),
           fetch("/api/admin/leads"),
-          fetch("/api/admin/insights?type=hourly&date_preset=last_7d"),
+          fetch(`/api/admin/insights?type=hourly&${range}`),
         ]);
 
         const dailyJson: InsightsResponse = await dailyRes.json();
@@ -418,7 +421,7 @@ export default function AlertasPage() {
     }
 
     load();
-  }, [formatBRL, dateRange]);
+  }, [formatBRL, dateRange.start, dateRange.end]);
 
   if (loading) {
     return (

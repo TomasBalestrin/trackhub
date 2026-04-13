@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
@@ -40,18 +39,9 @@ interface CampaignEntry {
   actions?: { action_type: string; value: string }[];
 }
 
-type Period = "today" | "last_7d" | "last_14d" | "last_30d";
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const PERIOD_OPTIONS: readonly { value: string; label: string }[] = [
-  { value: "today", label: "Hoje" },
-  { value: "last_7d", label: "7 dias" },
-  { value: "last_14d", label: "14 dias" },
-  { value: "last_30d", label: "30 dias" },
-] as const;
 
 function formatNumber(value: number): string {
   return value.toLocaleString("pt-BR");
@@ -84,7 +74,6 @@ function formatDateShort(dateStr: string): string {
 
 export default function AdsPage() {
   const { formatBRL } = useExchangeRate();
-  const [period, setPeriod] = useState<Period>("last_7d");
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [daily, setDaily] = useState<DailyEntry[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
@@ -93,15 +82,18 @@ export default function AdsPage() {
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useSharedDateRange();
 
-  const fetchData = useCallback(async (p: Period) => {
+  const fetchData = useCallback(async (start: string | null, end: string | null) => {
     setLoading(true);
     setError(null);
 
     try {
+      const range = start && end
+        ? `since=${encodeURIComponent(start)}&until=${encodeURIComponent(end)}`
+        : "date_preset=last_30d";
       const [overviewRes, dailyRes, campaignsRes, leadsRes] = await Promise.all([
-        fetch(`/api/admin/insights?type=overview&date_preset=${p}`),
-        fetch(`/api/admin/insights?type=daily&date_preset=${p}`),
-        fetch(`/api/admin/insights?type=campaigns&date_preset=${p}`),
+        fetch(`/api/admin/insights?type=overview&${range}`),
+        fetch(`/api/admin/insights?type=daily&${range}`),
+        fetch(`/api/admin/insights?type=campaigns&${range}`),
         fetch("/api/admin/leads"),
       ]);
 
@@ -174,8 +166,8 @@ export default function AdsPage() {
   }, []);
 
   useEffect(() => {
-    fetchData(period);
-  }, [period, fetchData]);
+    fetchData(dateRange.start, dateRange.end);
+  }, [dateRange.start, dateRange.end, fetchData]);
 
   // ---------------------------------------------------------------------------
   // Derived values
@@ -257,13 +249,6 @@ export default function AdsPage() {
         </div>
         <div className="flex items-center gap-3">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
-          <div className="w-44">
-            <Select
-              options={PERIOD_OPTIONS}
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as Period)}
-            />
-          </div>
         </div>
       </div>
 
