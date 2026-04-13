@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** Fix crítico de qualificação (piso de renda) deployado + backfill de 42 leads. Próximo: calendários nos menus admin.
+**Current Work:** Fix Apps Script income/position + calendário em `/admin/leads` deployado. Pendente: replicar calendário nas outras 4 páginas admin; você colar novos Apps Scripts no Google.
 
 ---
 
@@ -115,7 +115,7 @@ _(nenhum no momento)_
 - [x] ~~Q3: Criar `vercel.json` com crons~~ (`.specs/quick/003-vercel-json-crons/`)
 - [x] ~~Q4: Segregar `WEBHOOK_SECRET`~~ — server OK; ops pendente (`.specs/quick/004-split-webhook-secret/`)
 - [ ] **Ops (Q4):** gerar `WEBHOOK_SECRET` aleatório, setar em Vercel, atualizar 3 Apps Scripts, rotacionar também `CRON_SECRET` (está em curl do README)
-- [ ] **Apps Script bug:** `monthly_income` vem concatenado com `position` ("Entre R$X Dono"). Investigar mapeamento de colunas em `public/google-apps-script.js` + gêmeos
+- [x] ~~**Apps Script bug** income/position concatenados~~ — helper adicionado em `public/script-mentoria-aovivo-{2,3}.js` + 10 leads backfillados (`.specs/features/f-apps-script-split-income-position/`). **Você precisa colar o novo código nos 2 projetos Apps Script do Google manualmente** (passos no SUMMARY).
 - [ ] **Calendários nos menus admin** — date range picker global + filtragem por período em dashboard, leads, ads, campaigns, ads/alertas
 - [x] ~~F1: Dedup `event_id` Pixel↔CAPI — DEPLOYADA EM PROD~~. Zero duplicatas pré-existentes (1217 rows escaneadas). UNIQUE INDEX criado, smoke test confirmou dedup (id duplicado POSTado → 1 row no DB). Validação Meta Events Manager pendente em uso real.
 - [x] ~~F2: Zod schemas em `fetchCampaigns`~~ (`.specs/features/f2-zod-meta-responses/`). Insights route fica para entrega futura.

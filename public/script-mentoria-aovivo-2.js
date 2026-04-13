@@ -5,6 +5,34 @@ var SOURCE = "mentoria-aovivo-2";
 var PROCESSED_KEY = "processedRows_v2";
 // ====================================================
 
+// Cargos conhecidos que aparecem como SUFIXO em monthly_income quando a
+// planilha mistura faturamento+cargo na mesma coluna.
+// Ex: "Entre R$15.000 e R$30.000 Dono" → income: "Entre R$15.000 e R$30.000", position: "Dono"
+var POSITION_SUFFIXES = [
+  "Dono", "Sócio", "Socio", "Vendedor", "Colaborador",
+  "CEO", "Gerente", "Diretor", "Gestor", "Empreendedor",
+  "Profissional", "Funcionário", "Funcionario", "Autônomo", "Autonomo"
+];
+
+/**
+ * Se `monthly_income` termina com um dos cargos conhecidos E `position` está
+ * vazio, separa a string em duas. Muta o objeto.
+ */
+function splitIncomePosition(lead) {
+  if (!lead || !lead.monthly_income || lead.position) return lead;
+  var income = String(lead.monthly_income).trim();
+  for (var i = 0; i < POSITION_SUFFIXES.length; i++) {
+    var suffix = POSITION_SUFFIXES[i];
+    var re = new RegExp("\\s+" + suffix + "\\s*$", "i");
+    if (re.test(income)) {
+      lead.position = suffix;
+      lead.monthly_income = income.replace(re, "").trim();
+      break;
+    }
+  }
+  return lead;
+}
+
 /**
  * Execute esta função UMA VEZ para criar o gatilho automático.
  * Usa onChange (detecta novas linhas) ao invés de onFormSubmit (só Google Forms).
@@ -114,6 +142,7 @@ function onSheetChange(e) {
       });
 
       lead.source = SOURCE;
+      splitIncomePosition(lead);
 
       if (lead.full_name && lead.email) {
         leads.push(lead);
@@ -217,6 +246,7 @@ function enviarTodosLeads() {
 
     if (lead.full_name && lead.email) {
       lead.source = SOURCE;
+      splitIncomePosition(lead);
       leads.push(lead);
     }
   }
