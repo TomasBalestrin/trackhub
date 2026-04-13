@@ -5,7 +5,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { extractHighestIncome } from "@/lib/lead/qualification";
+import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import type { Lead } from "@/types/lead";
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ export default function AdsPage() {
 
   const qualifiedCount = useMemo(() => {
     return leads.filter(
-      (l) => l.monthly_income && extractHighestIncome(l.monthly_income) >= 30000
+      (l) => isQualifiedIncome(l.monthly_income)
     ).length;
   }, [leads]);
 

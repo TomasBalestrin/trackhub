@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { extractHighestIncome } from "@/lib/lead/qualification";
+import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import type { MetaCampaignCache } from "@/types/lead";
 
 interface LeadData {
@@ -135,7 +135,7 @@ export default function CampaignsPage() {
     Object.values(grouped).forEach((g) => {
       g.total_leads = g.leads.length;
       g.qualified_leads = g.leads.filter(
-        (l) => l.monthly_income && extractHighestIncome(l.monthly_income) >= 30000
+        (l) => isQualifiedIncome(l.monthly_income)
       ).length;
 
       if (g.leads.length > 0) {
@@ -486,7 +486,7 @@ export default function CampaignsPage() {
                             {campaign.leads
                               .sort((a, b) => b.qualification_score - a.qualification_score)
                               .map((lead) => {
-                                const isQualified = lead.monthly_income && extractHighestIncome(lead.monthly_income) >= 30000;
+                                const isQualified = isQualifiedIncome(lead.monthly_income);
                                 return (
                                   <tr key={lead.id} className={`border-b border-gray-50 ${isQualified ? "bg-success/5" : ""}`}>
                                     <td className="px-3 py-2">

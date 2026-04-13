@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   extractHighestIncome,
+  extractLowestIncome,
+  isQualifiedIncome,
   calculateQualificationScore,
   getScoreLabel,
   getScoreColor,
@@ -50,7 +52,7 @@ describe("calculateQualificationScore", () => {
     ).toBe(0);
   });
 
-  it("score 50 for income >= 1M", () => {
+  it("score 50 when floor >= 1M", () => {
     const s = calculateQualificationScore({
       monthly_income: "Acima de R$1.000.000",
       how_found: null,
@@ -60,7 +62,7 @@ describe("calculateQualificationScore", () => {
     expect(s).toBe(50);
   });
 
-  it("score 45 for income >= 100k and < 1M", () => {
+  it("score 45 when floor >= 100k and < 1M", () => {
     const s = calculateQualificationScore({
       monthly_income: "Entre R$100.000 e R$500.000",
       how_found: null,
@@ -70,10 +72,10 @@ describe("calculateQualificationScore", () => {
     expect(s).toBe(45);
   });
 
-  it("score 35 for income >= 30k and < 100k (qualified threshold)", () => {
-    // Range cujo MAIOR valor cai em [30k, 100k) — a função usa extractHighestIncome
+  it("score 35 when floor >= 30k and < 100k (qualified threshold)", () => {
+    // Piso em 30k, teto em 100k → qualificado
     const s = calculateQualificationScore({
-      monthly_income: "Entre R$30.000 e R$50.000",
+      monthly_income: "Entre R$30.000 e R$100.000",
       how_found: null,
       city: null,
       state: null,
@@ -81,7 +83,18 @@ describe("calculateQualificationScore", () => {
     expect(s).toBe(35);
   });
 
-  it("score 5 for income below 30k (not qualified)", () => {
+  it("score 5 for 'R$15.000 - R$30.000' (piso 15k, NÃO qualifica)", () => {
+    // Regressão: antes o teto batia 30k e inflava para 35 pts falsamente.
+    const s = calculateQualificationScore({
+      monthly_income: "R$ 15.000 - R$ 30.000",
+      how_found: null,
+      city: null,
+      state: null,
+    });
+    expect(s).toBe(5);
+  });
+
+  it("score 5 for income below 15k (not qualified)", () => {
     const s = calculateQualificationScore({
       monthly_income: "Até R$10.000",
       how_found: null,
@@ -121,9 +134,9 @@ describe("calculateQualificationScore", () => {
   });
 
   it("composes additively (real qualified lead)", () => {
-    // 35 (income 30-100k) + 30 (instagram) + 10 (city) + 10 (state) = 85
+    // 35 (piso 30k) + 30 (instagram) + 10 (city) + 10 (state) = 85
     const s = calculateQualificationScore({
-      monthly_income: "Entre R$30.000 e R$50.000",
+      monthly_income: "Entre R$30.000 e R$100.000",
       how_found: "instagram",
       ...baseLocation,
     });
@@ -137,6 +150,49 @@ describe("calculateQualificationScore", () => {
       ...baseLocation,
     });
     expect(s).toBe(100);
+  });
+});
+
+describe("extractLowestIncome", () => {
+  it("returns 0 for null/undefined/empty", () => {
+    expect(extractLowestIncome(null)).toBe(0);
+    expect(extractLowestIncome(undefined)).toBe(0);
+    expect(extractLowestIncome("")).toBe(0);
+  });
+
+  it("returns the MIN of a range", () => {
+    expect(extractLowestIncome("R$ 15.000 - R$ 30.000")).toBe(15000);
+    expect(extractLowestIncome("Entre R$30.000 e R$100.000")).toBe(30000);
+    expect(extractLowestIncome("R$ 250.000 - R$ 500.000")).toBe(250000);
+  });
+
+  it("returns the only value for single-point strings", () => {
+    expect(extractLowestIncome("Acima de R$1.000.000")).toBe(1000000);
+    expect(extractLowestIncome("Até R$10.000")).toBe(10000);
+  });
+});
+
+describe("isQualifiedIncome (regra: piso >= 30k)", () => {
+  it.each([
+    ["Até R$ 15.000", false],
+    ["R$ 15.000 - R$ 30.000", false], // regressão crítica
+    ["R$ 30.000 - R$ 100.000", true],
+    ["R$ 100.000 - R$ 250.000", true],
+    ["R$ 250.000 - R$ 500.000", true],
+    ["R$ 500.000 - R$ 1.000.000", true],
+    ["Acima de R$ 1.000.000", true],
+    [null, false],
+    [undefined, false],
+    ["", false],
+  ])("%s → %s", (input, expected) => {
+    expect(isQualifiedIncome(input as string | null | undefined)).toBe(expected);
+  });
+
+  it("handles INCOME_OPTIONS value format (with underscores)", () => {
+    // Se algum caller passar o VALUE bruto "15000_30000", a função lê
+    // 15000 e 30000 como dois números e retorna piso = 15000 → não qualifica.
+    expect(isQualifiedIncome("15000_30000")).toBe(false);
+    expect(isQualifiedIncome("30000_100000")).toBe(true);
   });
 });
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { extractHighestIncome } from "@/lib/lead/qualification";
+import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import type { Lead } from "@/types/lead";
 
 /* ------------------------------------------------------------------ */
@@ -201,7 +201,7 @@ function generateAlerts(
   /* 6. Lead Quality — % of leads with income >= 30k */
   if (leads.length > 0) {
     const highIncome = leads.filter(
-      (l) => extractHighestIncome(l.monthly_income) >= 30000
+      (l) => isQualifiedIncome(l.monthly_income)
     );
     const pct = Math.round((highIncome.length / leads.length) * 100);
     alerts.push({

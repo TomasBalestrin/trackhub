@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
-import { getScoreLabel, extractHighestIncome } from "@/lib/lead/qualification";
+import { getScoreLabel, extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import type { Lead, LeadStatus } from "@/types/lead";
 import { INCOME_OPTIONS } from "@/types/lead";
 
@@ -65,7 +65,7 @@ export default function LeadsPage() {
   ];
 
   const qualifiedCount = leads.filter(
-    (l) => l.monthly_income && extractHighestIncome(l.monthly_income) >= 30000
+    (l) => isQualifiedIncome(l.monthly_income)
   ).length;
 
   const filteredLeads = leads.filter((lead) => {
@@ -185,7 +185,7 @@ export default function LeadsPage() {
                   </td>
                   <td className="px-4 py-3 text-navy-70">{lead.phone}</td>
                   <td className="px-4 py-3">
-                    <span className={`${lead.monthly_income && extractHighestIncome(lead.monthly_income) >= 30000 ? "text-success font-semibold" : "text-navy-70"}`}>
+                    <span className={`${isQualifiedIncome(lead.monthly_income) ? "text-success font-semibold" : "text-navy-70"}`}>
                       {lead.monthly_income || "N/A"}
                     </span>
                   </td>

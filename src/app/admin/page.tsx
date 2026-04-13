@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { extractHighestIncome } from "@/lib/lead/qualification";
+import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import type { Lead } from "@/types/lead";
 
 interface InsightsRow {
@@ -120,7 +120,7 @@ export default function PremiumDashboard() {
 
   const todayLeads = leads.filter((l) => l.created_at >= todayStart);
   const weekLeads = leads.filter((l) => l.created_at >= weekStart);
-  const qualifiedLeads = leads.filter((l) => l.monthly_income && extractHighestIncome(l.monthly_income) >= 30000);
+  const qualifiedLeads = leads.filter((l) => isQualifiedIncome(l.monthly_income));
   const recentLeads = leads.slice(0, 8);
 
   // Meta insights
@@ -172,7 +172,7 @@ export default function PremiumDashboard() {
     const income = l.monthly_income || "N/A";
     if (!byIncome[income]) byIncome[income] = { total: 0, qualified: 0 };
     byIncome[income].total++;
-    if (extractHighestIncome(income) >= 30000) byIncome[income].qualified++;
+    if (isQualifiedIncome(income)) byIncome[income].qualified++;
   });
 
   // Status breakdown
@@ -548,7 +548,7 @@ export default function PremiumDashboard() {
             {Object.entries(byIncome)
               .sort((a, b) => b[1].total - a[1].total)
               .map(([income, data]) => {
-                const isQualified = extractHighestIncome(income) >= 30000;
+                const isQualified = isQualifiedIncome(income);
                 return (
                   <div key={income} className={`flex items-center justify-between p-2 rounded ${isQualified ? "bg-success/5" : ""}`}>
                     <div className="flex items-center gap-2">
@@ -588,7 +588,7 @@ export default function PremiumDashboard() {
             </thead>
             <tbody>
               {recentLeads.map((lead) => {
-                const isQualified = lead.monthly_income && extractHighestIncome(lead.monthly_income) >= 30000;
+                const isQualified = isQualifiedIncome(lead.monthly_income);
                 return (
                   <tr key={lead.id} className={`border-b border-gray-50 ${isQualified ? "bg-success/5" : ""}`}>
                     <td className="px-3 py-2">
