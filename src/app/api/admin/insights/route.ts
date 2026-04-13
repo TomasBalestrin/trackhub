@@ -8,6 +8,7 @@ const DEFAULT_LIMIT = 100;
 type InsightType =
   | "overview"
   | "campaigns"
+  | "adsets"
   | "ads"
   | "hourly"
   | "demographics"
@@ -32,6 +33,11 @@ const TYPE_CONFIGS: Record<InsightType, TypeConfig> = {
     level: "campaign",
     fields:
       "campaign_name,campaign_id,impressions,clicks,spend,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type",
+  },
+  adsets: {
+    level: "adset",
+    fields:
+      "adset_name,adset_id,campaign_id,campaign_name,impressions,clicks,spend,cpc,cpm,ctr,reach,frequency,actions,cost_per_action_type",
   },
   ads: {
     level: "ad",

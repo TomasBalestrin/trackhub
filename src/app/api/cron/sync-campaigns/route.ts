@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { fetchCampaigns } from "@/lib/meta/marketing-api";
+import { fetchAdsets, fetchCampaigns } from "@/lib/meta/marketing-api";
 import { log } from "@/lib/log";
 
 export async function GET(request: NextRequest) {
@@ -23,8 +23,10 @@ export async function GET(request: NextRequest) {
     const campaigns = await fetchCampaigns(accessToken, adAccountId);
     const supabase = createServiceClient();
 
-    let upserted = 0;
+    let adsUpserted = 0;
+    const campaignIds = new Set<string>();
     for (const campaign of campaigns) {
+      campaignIds.add(campaign.campaign_id);
       const { error } = await supabase
         .from("meta_campaigns_cache")
         .upsert(
@@ -45,13 +47,51 @@ export async function GET(request: NextRequest) {
           { onConflict: "ad_id" }
         );
 
-      if (!error) upserted++;
+      if (!error) adsUpserted++;
+    }
+
+    // Sync adsets (metadados de configuração por conjunto). Independente do
+    // sync de ads acima — uma call a /adsets por campanha.
+    let adsetsUpserted = 0;
+    for (const cid of campaignIds) {
+      try {
+        const adsets = await fetchAdsets(accessToken, cid);
+        for (const a of adsets) {
+          const { error } = await supabase.from("meta_adsets_cache").upsert(
+            {
+              adset_id: a.adset_id,
+              adset_name: a.adset_name,
+              campaign_id: a.campaign_id,
+              status: a.status,
+              daily_budget: a.daily_budget,
+              lifetime_budget: a.lifetime_budget,
+              bid_strategy: a.bid_strategy,
+              optimization_goal: a.optimization_goal,
+              billing_event: a.billing_event,
+              targeting: a.targeting,
+              start_time: a.start_time,
+              end_time: a.end_time,
+              raw_data: a.raw as unknown as Record<string, unknown>,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "adset_id" }
+          );
+          if (!error) adsetsUpserted++;
+        }
+      } catch (err) {
+        log.error(
+          { err, campaign_id: cid, route: "cron/sync-campaigns" },
+          "adsets sync failed for campaign"
+        );
+      }
     }
 
     return NextResponse.json({
       success: true,
-      total: campaigns.length,
-      upserted,
+      ads_total: campaigns.length,
+      ads_upserted: adsUpserted,
+      adsets_upserted: adsetsUpserted,
+      campaigns_discovered: campaignIds.size,
     });
   } catch (error) {
     log.error({ err: error, route: "cron/sync-campaigns" }, "campaign sync failed");

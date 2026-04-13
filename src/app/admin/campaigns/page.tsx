@@ -59,6 +59,45 @@ interface InsightsRow {
   cost_per_lead?: number;
 }
 
+interface AdsetInsightRow {
+  adset_id?: string;
+  adset_name?: string;
+  campaign_id?: string;
+  campaign_name?: string;
+  impressions?: string;
+  clicks?: string;
+  spend?: string;
+  ctr?: string;
+  cpc?: string;
+  leads?: number;
+  cost_per_lead?: number;
+}
+
+interface AdsetRow {
+  adset_id: string;
+  adset_name: string;
+  campaign_id: string;
+  status: string | null;
+  daily_budget: number | null;
+  lifetime_budget: number | null;
+  bid_strategy: string | null;
+  optimization_goal: string | null;
+  billing_event: string | null;
+  targeting: {
+    age_min: number | null;
+    age_max: number | null;
+    genders: string[];
+    geo_countries: string[];
+    geo_regions: string[];
+    geo_cities: string[];
+    interests_count: number;
+    behaviors_count: number;
+    custom_audiences_count: number;
+  } | null;
+  start_time: string | null;
+  end_time: string | null;
+}
+
 const STATUS_FILTER_OPTIONS = [
   { value: "", label: "Todos os status" },
   { value: "ACTIVE", label: "Ativas" },
@@ -74,6 +113,8 @@ const PERIOD_OPTIONS = [
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<CampaignGroup[]>([]);
+  const [adsets, setAdsets] = useState<AdsetRow[]>([]);
+  const [adsetInsights, setAdsetInsights] = useState<AdsetInsightRow[]>([]);
   const [insights, setInsights] = useState<InsightsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -82,6 +123,7 @@ export default function CampaignsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [period, setPeriod] = useState("last_7d");
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+  const [expandedAdset, setExpandedAdset] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>(() =>
     presetToRange("last_30d", "created_at")
   );
@@ -100,6 +142,8 @@ export default function CampaignsPage() {
     const data = await res.json();
 
     const campaignsData = (data.campaigns || []) as MetaCampaignCache[];
+    const adsetsData = (data.adsets || []) as AdsetRow[];
+    setAdsets(adsetsData);
     const rawLeads = (data.leads || []) as LeadData[];
     // Filtra leads pelo período escolhido antes de agrupar por campanha.
     const leadsData = filterByDateRange(rawLeads, dateRange);
@@ -180,11 +224,17 @@ export default function CampaignsPage() {
 
   async function loadInsights() {
     try {
-      const res = await fetch(`/api/admin/insights?type=campaigns&date_preset=${period}`);
-      const data = await res.json();
-      setInsights(data.data || []);
+      const [campaignRes, adsetRes] = await Promise.all([
+        fetch(`/api/admin/insights?type=campaigns&date_preset=${period}`),
+        fetch(`/api/admin/insights?type=adsets&date_preset=${period}`),
+      ]);
+      const campaignData = await campaignRes.json();
+      const adsetData = await adsetRes.json();
+      setInsights(campaignData.data || []);
+      setAdsetInsights(adsetData.data || []);
     } catch {
       setInsights([]);
+      setAdsetInsights([]);
     }
   }
 
@@ -195,7 +245,9 @@ export default function CampaignsPage() {
       const res = await fetch("/api/admin/campaigns", { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        setSyncResult(`Sincronizado: ${data.upserted}/${data.total} anúncios`);
+        setSyncResult(
+          `Sincronizado: ${data.ads_upserted}/${data.ads_total} anúncios · ${data.adsets_upserted} adsets`
+        );
         loadData();
       } else {
         setSyncResult("Erro: " + (data.error || "falha desconhecida"));
@@ -208,6 +260,14 @@ export default function CampaignsPage() {
 
   function getInsight(campaignName: string): InsightsRow | null {
     return insights.find((i) => i.campaign_name === campaignName) || null;
+  }
+
+  function getAdsetInsight(adsetId: string): AdsetInsightRow | null {
+    return adsetInsights.find((i) => i.adset_id === adsetId) || null;
+  }
+
+  function getAdsetsForCampaign(campaignId: string): AdsetRow[] {
+    return adsets.filter((a) => a.campaign_id === campaignId);
   }
 
   const filtered = campaigns.filter((c) => {
@@ -431,40 +491,222 @@ export default function CampaignsPage() {
                     </div>
                   </div>
 
-                  {/* Ads Table */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-navy-dark mb-3">Anúncios ({campaign.ads.length})</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-200">
-                            <th className="text-left px-3 py-2 font-medium text-navy-70">Anúncio</th>
-                            <th className="text-left px-3 py-2 font-medium text-navy-70">Conjunto</th>
-                            <th className="text-left px-3 py-2 font-medium text-navy-70">Tipo</th>
-                            <th className="text-left px-3 py-2 font-medium text-navy-70">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {campaign.ads.map((ad) => (
-                            <tr key={ad.id} className="border-b border-gray-50">
-                              <td className="px-3 py-2 text-navy-dark font-medium">{ad.ad_name || "N/A"}</td>
-                              <td className="px-3 py-2 text-navy-50">{ad.adset_name || "N/A"}</td>
-                              <td className="px-3 py-2">
-                                <Badge variant={ad.creative_type === "VIDEO" ? "info" : "default"}>
-                                  {ad.creative_type || "N/A"}
-                                </Badge>
-                              </td>
-                              <td className="px-3 py-2">
-                                <Badge variant={ad.status === "ACTIVE" ? "success" : "default"}>
-                                  {ad.status || "N/A"}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  {/* Adsets (conjuntos de anúncios) */}
+                  {(() => {
+                    const campaignAdsets = getAdsetsForCampaign(campaign.campaign_id);
+                    if (campaignAdsets.length === 0) {
+                      return (
+                        <div>
+                          <h4 className="text-sm font-semibold text-navy-dark mb-3">
+                            Conjuntos de anúncios
+                          </h4>
+                          <p className="text-xs text-navy-50">
+                            Nenhum adset em cache. Clique em <strong>Sync Meta</strong> no topo para importar.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div>
+                        <h4 className="text-sm font-semibold text-navy-dark mb-3">
+                          Conjuntos de anúncios ({campaignAdsets.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {campaignAdsets.map((adset) => {
+                            const ai = getAdsetInsight(adset.adset_id);
+                            const adsInAdset = campaign.ads.filter((ad) => ad.adset_id === adset.adset_id);
+                            const isAdsetExpanded = expandedAdset === adset.adset_id;
+                            const leadsCount = ai?.leads ?? 0;
+                            const spend = ai ? parseFloat(ai.spend || "0") : 0;
+                            const cpl = ai?.cost_per_lead ?? (leadsCount > 0 ? spend / leadsCount : 0);
+                            const ctr = ai ? parseFloat(ai.ctr || "0") : 0;
+                            return (
+                              <div key={adset.adset_id} className="rounded-md border border-gray-200 overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedAdset(isAdsetExpanded ? null : adset.adset_id)
+                                  }
+                                  className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                >
+                                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                                    <div className="flex-1 min-w-[200px]">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-semibold text-navy-dark">
+                                          {adset.adset_name}
+                                        </span>
+                                        <Badge
+                                          variant={
+                                            adset.status === "ACTIVE"
+                                              ? "success"
+                                              : adset.status === "PAUSED"
+                                              ? "warning"
+                                              : "default"
+                                          }
+                                        >
+                                          {adset.status === "ACTIVE"
+                                            ? "Ativo"
+                                            : adset.status === "PAUSED"
+                                            ? "Pausado"
+                                            : adset.status || "N/A"}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-navy-50">
+                                        <span>{adsInAdset.length} anúncio(s)</span>
+                                        {adset.daily_budget != null && (
+                                          <span>Budget diário: {formatBRL(adset.daily_budget)}</span>
+                                        )}
+                                        {adset.lifetime_budget != null && (
+                                          <span>Budget total: {formatBRL(adset.lifetime_budget)}</span>
+                                        )}
+                                        {adset.optimization_goal && (
+                                          <span>Meta: {adset.optimization_goal}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 text-right">
+                                      <div>
+                                        <p className="text-xs text-navy-50">Leads</p>
+                                        <p className="text-sm font-bold text-navy-dark">{leadsCount}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-navy-50">Gasto</p>
+                                        <p className="text-sm font-bold text-navy-dark">
+                                          {spend > 0 ? formatBRL(spend) : "—"}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-navy-50">CPL</p>
+                                        <p className="text-sm font-bold text-navy-dark">
+                                          {cpl > 0 ? formatBRL(cpl) : "—"}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-navy-50">CTR</p>
+                                        <p className="text-sm font-bold text-navy-dark">
+                                          {ctr.toFixed(2)}%
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {isAdsetExpanded && (
+                                  <div className="p-3 bg-white space-y-3">
+                                    {/* Targeting summary */}
+                                    {adset.targeting && (
+                                      <div>
+                                        <p className="text-xs font-semibold text-navy-70 mb-2">
+                                          Segmentação
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 text-xs">
+                                          {(adset.targeting.age_min || adset.targeting.age_max) && (
+                                            <Badge variant="default">
+                                              Idade {adset.targeting.age_min ?? "?"}–
+                                              {adset.targeting.age_max ?? "?"}
+                                            </Badge>
+                                          )}
+                                          {adset.targeting.genders.length > 0 && (
+                                            <Badge variant="default">
+                                              {adset.targeting.genders.join("/")}
+                                            </Badge>
+                                          )}
+                                          {adset.targeting.geo_countries.length > 0 && (
+                                            <Badge variant="default">
+                                              {adset.targeting.geo_countries.join(", ")}
+                                            </Badge>
+                                          )}
+                                          {adset.targeting.geo_regions.length > 0 && (
+                                            <Badge variant="default">
+                                              {adset.targeting.geo_regions.slice(0, 3).join(", ")}
+                                              {adset.targeting.geo_regions.length > 3 && " +"}
+                                            </Badge>
+                                          )}
+                                          {adset.targeting.geo_cities.length > 0 && (
+                                            <Badge variant="default">
+                                              {adset.targeting.geo_cities.slice(0, 3).join(", ")}
+                                              {adset.targeting.geo_cities.length > 3 && " +"}
+                                            </Badge>
+                                          )}
+                                          {adset.targeting.interests_count > 0 && (
+                                            <Badge variant="default">
+                                              {adset.targeting.interests_count} interesse(s)
+                                            </Badge>
+                                          )}
+                                          {adset.targeting.behaviors_count > 0 && (
+                                            <Badge variant="default">
+                                              {adset.targeting.behaviors_count} comportamento(s)
+                                            </Badge>
+                                          )}
+                                          {adset.targeting.custom_audiences_count > 0 && (
+                                            <Badge variant="default">
+                                              {adset.targeting.custom_audiences_count} públic. custom.
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Bid / billing info */}
+                                    {(adset.bid_strategy || adset.billing_event) && (
+                                      <div className="text-xs text-navy-50 flex gap-4">
+                                        {adset.bid_strategy && (
+                                          <span>Bid: {adset.bid_strategy}</span>
+                                        )}
+                                        {adset.billing_event && (
+                                          <span>Cobrança: {adset.billing_event}</span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Ads inside this adset */}
+                                    <div>
+                                      <p className="text-xs font-semibold text-navy-70 mb-2">
+                                        Anúncios ({adsInAdset.length})
+                                      </p>
+                                      {adsInAdset.length === 0 ? (
+                                        <p className="text-xs text-navy-30">Nenhum anúncio nesse conjunto.</p>
+                                      ) : (
+                                        <table className="w-full text-sm">
+                                          <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-200">
+                                              <th className="text-left px-3 py-2 font-medium text-navy-70">Anúncio</th>
+                                              <th className="text-left px-3 py-2 font-medium text-navy-70">Tipo</th>
+                                              <th className="text-left px-3 py-2 font-medium text-navy-70">Status</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {adsInAdset.map((ad) => (
+                                              <tr key={ad.id} className="border-b border-gray-50">
+                                                <td className="px-3 py-2 text-navy-dark font-medium">
+                                                  {ad.ad_name || "N/A"}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                  <Badge variant={ad.creative_type === "VIDEO" ? "info" : "default"}>
+                                                    {ad.creative_type || "N/A"}
+                                                  </Badge>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                  <Badge variant={ad.status === "ACTIVE" ? "success" : "default"}>
+                                                    {ad.status || "N/A"}
+                                                  </Badge>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Leads Table */}
                   {campaign.leads.length > 0 && (
