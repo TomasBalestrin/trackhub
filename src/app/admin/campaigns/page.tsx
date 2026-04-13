@@ -573,9 +573,13 @@ export default function CampaignsPage() {
                             const qualifiedInAdset = leadsInAdset.filter((l) =>
                               isQualifiedIncome(l.monthly_income)
                             ).length;
-                            const leadsCount = ai?.leads ?? 0;
+                            // Prioriza leads do nosso DB (matched por _adsetId) sobre
+                            // a contagem da Meta — em campanhas OFFSITE_CONVERSIONS a
+                            // Meta não reporta "lead" no nível de adset.
+                            const leadsApi = ai?.leads ?? 0;
+                            const leadsCount = leadsInAdset.length || leadsApi;
                             const spend = ai ? parseFloat(ai.spend || "0") : 0;
-                            const cpl = ai?.cost_per_lead ?? (leadsCount > 0 ? spend / leadsCount : 0);
+                            const cpl = leadsCount > 0 ? spend / leadsCount : (ai?.cost_per_lead ?? 0);
                             const ctr = ai ? parseFloat(ai.ctr || "0") : 0;
                             return (
                               <div key={adset.adset_id} className={`rounded-md overflow-hidden transition-all ${isAdsetExpanded ? "border-2 border-gold shadow-[var(--shadow-sm)]" : "border border-gray-200"}`}>
@@ -765,7 +769,8 @@ export default function CampaignsPage() {
                                               const adSpend = adi ? parseFloat(adi.spend || "0") : 0;
                                               const adCtr = adi ? parseFloat(adi.ctr || "0") : 0;
                                               const adLeadsApi = adi?.leads ?? 0;
-                                              const adCpl = adi?.cost_per_lead ?? (adLeadsApi > 0 ? adSpend / adLeadsApi : 0);
+                                              const adLeadsCount = leadsInAd.length || adLeadsApi;
+                                              const adCpl = adLeadsCount > 0 ? adSpend / adLeadsCount : (adi?.cost_per_lead ?? 0);
                                               return (
                                                 <tr key={ad.id} className="border-b border-gray-50">
                                                   <td className="px-3 py-2 text-navy-dark font-medium">
@@ -785,8 +790,8 @@ export default function CampaignsPage() {
                                                     {qualifiedInAd}
                                                   </td>
                                                   <td className="px-3 py-2 text-right text-navy-70">
-                                                    {leadsInAd.length}
-                                                    {adLeadsApi > 0 && adLeadsApi !== leadsInAd.length && (
+                                                    {adLeadsCount}
+                                                    {leadsInAd.length > 0 && adLeadsApi > 0 && adLeadsApi !== leadsInAd.length && (
                                                       <span className="text-xs text-navy-30 ml-1">
                                                         ({adLeadsApi} api)
                                                       </span>
