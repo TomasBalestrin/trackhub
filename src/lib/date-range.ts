@@ -21,8 +21,11 @@ export type DateRangePreset =
   | "yesterday"
   | "last_7d"
   | "last_14d"
+  | "last_15d"
   | "last_30d"
   | "last_90d"
+  | "last_180d"
+  | "last_365d"
   | "custom";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,10 +59,16 @@ export function presetToRange(
       return { start: addDays(today, -6).toISOString(), end: addDays(today, 1).toISOString(), field };
     case "last_14d":
       return { start: addDays(today, -13).toISOString(), end: addDays(today, 1).toISOString(), field };
+    case "last_15d":
+      return { start: addDays(today, -14).toISOString(), end: addDays(today, 1).toISOString(), field };
     case "last_30d":
       return { start: addDays(today, -29).toISOString(), end: addDays(today, 1).toISOString(), field };
     case "last_90d":
       return { start: addDays(today, -89).toISOString(), end: addDays(today, 1).toISOString(), field };
+    case "last_180d":
+      return { start: addDays(today, -179).toISOString(), end: addDays(today, 1).toISOString(), field };
+    case "last_365d":
+      return { start: addDays(today, -364).toISOString(), end: addDays(today, 1).toISOString(), field };
   }
 }
 
@@ -113,9 +122,46 @@ export const DATE_FIELD_LABELS: Record<DateField, string> = {
 export const PRESET_LABELS: Record<DateRangePreset, string> = {
   today: "Hoje",
   yesterday: "Ontem",
-  last_7d: "7 dias",
+  last_7d: "Últimos 7 dias",
   last_14d: "14 dias",
-  last_30d: "30 dias",
-  last_90d: "90 dias",
+  last_15d: "Últimos 15 dias",
+  last_30d: "Últimos 30 dias",
+  last_90d: "Trimestral",
+  last_180d: "Semestral",
+  last_365d: "Últimos 12 meses",
   custom: "Personalizado",
 };
+
+/**
+ * Dias da semana no formato "DO, 2ª, 3ª, 4ª, 5ª, 6ª, SÁ" para header do grid.
+ * Começa no Domingo (índice 0).
+ */
+export const WEEKDAY_SHORT_PT = ["DO", "2ª", "3ª", "4ª", "5ª", "6ª", "SÁ"];
+
+export const MONTH_SHORT_PT = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
+
+export function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Retorna array com os 42 dias a serem renderizados no grid do mês (6 semanas),
+ * começando no domingo antes ou no dia 1 do mês, até preencher 6 semanas.
+ */
+export function buildMonthGrid(year: number, month: number): Date[] {
+  const firstOfMonth = new Date(year, month, 1);
+  const dayOfWeek = firstOfMonth.getDay();
+  const gridStart = new Date(year, month, 1 - dayOfWeek);
+  const days: Date[] = [];
+  for (let i = 0; i < 42; i++) {
+    days.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
+  }
+  return days;
+}

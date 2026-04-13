@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
+import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
 import type { Lead } from "@/types/lead";
 
 /* ------------------------------------------------------------------ */
@@ -320,6 +322,9 @@ export default function AlertasPage() {
     bestCampaign: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<DateRange>(() =>
+    presetToRange("last_30d", "created_at")
+  );
 
   useEffect(() => {
     async function load() {
@@ -339,7 +344,9 @@ export default function AlertasPage() {
         const dailyData = dailyJson.data || [];
         const campaignData = campaignJson.data || [];
         const hourlyData = hourlyJson.data || [];
-        const leads = Array.isArray(leadsJson) ? leadsJson : [];
+        const rawLeads = Array.isArray(leadsJson) ? leadsJson : [];
+        // Aplica o filtro de período escolhido sobre os leads antes das heurísticas.
+        const leads = filterByDateRange(rawLeads, dateRange);
 
         // Generate alerts
         const generatedAlerts = generateAlerts(dailyData, campaignData, hourlyData, leads, formatBRL);
@@ -412,7 +419,7 @@ export default function AlertasPage() {
     }
 
     load();
-  }, [formatBRL]);
+  }, [formatBRL, dateRange]);
 
   if (loading) {
     return (
@@ -425,13 +432,16 @@ export default function AlertasPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-navy-dark">
-          Alertas & Insights
-        </h1>
-        <p className="text-sm text-navy-50">
-          Monitoramento automatico de performance
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-navy-dark">
+            Alertas & Insights
+          </h1>
+          <p className="text-sm text-navy-50">
+            Monitoramento automatico de performance
+          </p>
+        </div>
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
 
       {/* Resumo Semanal */}

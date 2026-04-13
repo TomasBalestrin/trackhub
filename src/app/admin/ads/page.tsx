@@ -5,7 +5,9 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
+import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
 import type { Lead } from "@/types/lead";
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,9 @@ export default function AdsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>(() =>
+    presetToRange("last_30d", "created_at")
+  );
 
   const fetchData = useCallback(async (p: Period) => {
     setLoading(true);
@@ -140,11 +145,10 @@ export default function AdsPage() {
   const totalClicks = overview?.clicks ?? 0;
   const totalLandingPageViews = extractLandingPageViews(overview?.actions);
 
+  const leadsInRange = useMemo(() => filterByDateRange(leads, dateRange), [leads, dateRange]);
   const qualifiedCount = useMemo(() => {
-    return leads.filter(
-      (l) => isQualifiedIncome(l.monthly_income)
-    ).length;
-  }, [leads]);
+    return leadsInRange.filter((l) => isQualifiedIncome(l.monthly_income)).length;
+  }, [leadsInRange]);
 
   // Campaign table sorted by leads desc
   const sortedCampaigns = useMemo(() => {
@@ -206,12 +210,15 @@ export default function AdsPage() {
           <h1 className="text-2xl font-bold text-navy-dark">Performance de Ads</h1>
           <p className="text-sm text-navy-50">Dados da Meta Marketing API</p>
         </div>
-        <div className="w-44">
-          <Select
-            options={PERIOD_OPTIONS}
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as Period)}
-          />
+        <div className="flex items-center gap-3">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <div className="w-44">
+            <Select
+              options={PERIOD_OPTIONS}
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as Period)}
+            />
+          </div>
         </div>
       </div>
 

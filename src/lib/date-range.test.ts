@@ -4,6 +4,8 @@ import {
   filterByDateRange,
   isoToDateInput,
   dateInputToIso,
+  buildMonthGrid,
+  isSameDay,
   type DateRange,
 } from "./date-range";
 
@@ -29,10 +31,33 @@ describe("presetToRange", () => {
     expect(isoToDateInput(r.end)).toBe("2026-01-16");
   });
 
+  it("last_15d: 15 day rolling window", () => {
+    const r = presetToRange("last_15d", "created_at", NOW);
+    expect(isoToDateInput(r.start)).toBe("2026-01-01"); // 15 - 14
+    expect(isoToDateInput(r.end)).toBe("2026-01-16");
+  });
+
   it("last_30d: covers 30 full days", () => {
     const r = presetToRange("last_30d", "created_at", NOW);
     expect(isoToDateInput(r.start)).toBe("2025-12-17");
     expect(isoToDateInput(r.end)).toBe("2026-01-16");
+  });
+
+  it("last_90d (trimestral): 90 day window", () => {
+    const r = presetToRange("last_90d", "created_at", NOW);
+    expect(isoToDateInput(r.end)).toBe("2026-01-16");
+    // 90 - 1 dia antes
+    expect(isoToDateInput(r.start)).toBe("2025-10-18");
+  });
+
+  it("last_180d (semestral) and last_365d (12 meses) shape check", () => {
+    const r180 = presetToRange("last_180d", "created_at", NOW);
+    const r365 = presetToRange("last_365d", "created_at", NOW);
+    expect(isoToDateInput(r180.end)).toBe("2026-01-16");
+    expect(isoToDateInput(r365.end)).toBe("2026-01-16");
+    // 180 dias antes do end exclusivo (16/01 2026): 20/07 2025
+    expect(isoToDateInput(r180.start)).toBe("2025-07-20");
+    expect(isoToDateInput(r365.start)).toBe("2025-01-16");
   });
 
   it("propagates the field choice", () => {
@@ -84,6 +109,35 @@ describe("filterByDateRange", () => {
   it("open-ended start still excludes later rows above end", () => {
     const r: DateRange = { start: null, end: "2026-01-15T00:00:00Z", field: "created_at" };
     expect(filterByDateRange(rows, r).map((x) => x.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("buildMonthGrid", () => {
+  it("returns exactly 42 days (6 weeks)", () => {
+    expect(buildMonthGrid(2026, 3).length).toBe(42); // abril 2026
+  });
+
+  it("starts on a Sunday", () => {
+    const grid = buildMonthGrid(2026, 3); // abr/2026
+    expect(grid[0].getDay()).toBe(0);
+  });
+
+  it("includes all days of the target month", () => {
+    const grid = buildMonthGrid(2026, 0); // jan/2026 (31 dias)
+    const inMonth = grid.filter((d) => d.getMonth() === 0);
+    expect(inMonth.length).toBe(31);
+  });
+});
+
+describe("isSameDay", () => {
+  it("ignores time component", () => {
+    const a = new Date(2026, 3, 13, 8, 0);
+    const b = new Date(2026, 3, 13, 23, 59);
+    expect(isSameDay(a, b)).toBe(true);
+  });
+
+  it("detects different days", () => {
+    expect(isSameDay(new Date(2026, 3, 13), new Date(2026, 3, 14))).toBe(false);
   });
 });
 

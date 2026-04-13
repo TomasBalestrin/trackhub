@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
+import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
 import type { Lead } from "@/types/lead";
 
 interface InsightsRow {
@@ -70,6 +72,9 @@ export default function PremiumDashboard() {
   const [placements, setPlacements] = useState<InsightsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("last_7d");
+  const [dateRange, setDateRange] = useState<DateRange>(() =>
+    presetToRange("last_30d", "created_at")
+  );
 
   useEffect(() => {
     fetchLeads();
@@ -113,15 +118,18 @@ export default function PremiumDashboard() {
     setLoading(false);
   }
 
-  // Lead computed stats
+  // Lead computed stats — tudo derivado de `leads` é filtrado pelo período
+  // escolhido no DateRangePicker. Os dois sub-KPIs "hoje" e "semana"
+  // permanecem calculados a partir do dataset completo como visão de entrada.
+  const filteredLeads = filterByDateRange(leads, dateRange);
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const todayLeads = leads.filter((l) => l.created_at >= todayStart);
   const weekLeads = leads.filter((l) => l.created_at >= weekStart);
-  const qualifiedLeads = leads.filter((l) => isQualifiedIncome(l.monthly_income));
-  const recentLeads = leads.slice(0, 8);
+  const qualifiedLeads = filteredLeads.filter((l) => isQualifiedIncome(l.monthly_income));
+  const recentLeads = filteredLeads.slice(0, 8);
 
   // Meta insights
   const s = overview?.summary;
@@ -134,7 +142,7 @@ export default function PremiumDashboard() {
   const ctr = s?.ctr || 0;
 
   // Qualification rate
-  const qualRate = leads.length > 0 ? Math.round((qualifiedLeads.length / leads.length) * 100) : 0;
+  const qualRate = filteredLeads.length > 0 ? Math.round((qualifiedLeads.length / filteredLeads.length) * 100) : 0;
 
   // Cost per qualified lead
   const cplQualified = qualifiedLeads.length > 0 ? totalSpend / qualifiedLeads.length : 0;
@@ -168,7 +176,7 @@ export default function PremiumDashboard() {
 
   // Income breakdown
   const byIncome: Record<string, { total: number; qualified: number }> = {};
-  leads.forEach((l) => {
+  filteredLeads.forEach((l) => {
     const income = l.monthly_income || "N/A";
     if (!byIncome[income]) byIncome[income] = { total: 0, qualified: 0 };
     byIncome[income].total++;
@@ -177,7 +185,7 @@ export default function PremiumDashboard() {
 
   // Status breakdown
   const byStatus: Record<string, number> = {};
-  leads.forEach((l) => {
+  filteredLeads.forEach((l) => {
     byStatus[l.status] = (byStatus[l.status] || 0) + 1;
   });
   const statusLabels: Record<string, string> = {
@@ -197,14 +205,14 @@ export default function PremiumDashboard() {
 
   // Source breakdown
   const bySource: Record<string, number> = {};
-  leads.forEach((l) => {
+  filteredLeads.forEach((l) => {
     const src = l.source || "Direto";
     bySource[src] = (bySource[src] || 0) + 1;
   });
 
   // Campaign lead count
   const byCampaign: Record<string, number> = {};
-  leads.forEach((l) => {
+  filteredLeads.forEach((l) => {
     const c = l.campaign_name || l.utm_campaign || "Direto";
     byCampaign[c] = (byCampaign[c] || 0) + 1;
   });
@@ -234,14 +242,17 @@ export default function PremiumDashboard() {
           <h1 className="text-2xl font-bold text-navy-dark">Dashboard</h1>
           <p className="text-sm text-navy-50">Visão geral do sistema de tracking</p>
         </div>
-        <Select options={PERIOD_OPTIONS} value={period} onChange={(e) => setPeriod(e.target.value)} />
+        <div className="flex items-center gap-3">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <Select options={PERIOD_OPTIONS} value={period} onChange={(e) => setPeriod(e.target.value)} />
+        </div>
       </div>
 
       {/* Row 1: Main KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <p className="text-xs text-navy-50 uppercase tracking-wider">Total Leads</p>
-          <p className="text-3xl font-bold text-navy-dark mt-1">{leads.length}</p>
+          <p className="text-xs text-navy-50 uppercase tracking-wider">Leads no período</p>
+          <p className="text-3xl font-bold text-navy-dark mt-1">{filteredLeads.length}</p>
           <div className="flex items-center gap-2 mt-2">
             <span className="text-xs text-gold font-semibold">+{todayLeads.length} hoje</span>
             <span className="text-xs text-navy-30">|</span>

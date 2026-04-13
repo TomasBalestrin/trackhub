@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
+import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
 import type { MetaCampaignCache } from "@/types/lead";
 
 interface LeadData {
@@ -80,11 +82,14 @@ export default function CampaignsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [period, setPeriod] = useState("last_7d");
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>(() =>
+    presetToRange("last_30d", "created_at")
+  );
   const { formatBRL } = useExchangeRate();
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [dateRange]);
 
   useEffect(() => {
     loadInsights();
@@ -95,7 +100,9 @@ export default function CampaignsPage() {
     const data = await res.json();
 
     const campaignsData = (data.campaigns || []) as MetaCampaignCache[];
-    const leadsData = (data.leads || []) as LeadData[];
+    const rawLeads = (data.leads || []) as LeadData[];
+    // Filtra leads pelo período escolhido antes de agrupar por campanha.
+    const leadsData = filterByDateRange(rawLeads, dateRange);
 
     // Group by campaign_name
     const grouped: Record<string, CampaignGroup> = {};
@@ -240,6 +247,7 @@ export default function CampaignsPage() {
           <p className="text-sm text-navy-50">Gestão e performance das campanhas Meta Ads</p>
         </div>
         <div className="flex items-center gap-3">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
           <Select options={PERIOD_OPTIONS} value={period} onChange={(e) => setPeriod(e.target.value)} />
           <button
             onClick={handleSync}
