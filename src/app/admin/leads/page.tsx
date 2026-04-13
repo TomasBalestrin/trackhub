@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { formatDate } from "@/lib/utils";
 import { getScoreLabel, extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
+import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
 import type { Lead, LeadStatus } from "@/types/lead";
 import { INCOME_OPTIONS } from "@/types/lead";
 
@@ -43,6 +45,9 @@ export default function LeadsPage() {
   const [incomeFilter, setIncomeFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [qualifiedOnly, setQualifiedOnly] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange>(() =>
+    presetToRange("last_30d", "created_at")
+  );
 
   useEffect(() => {
     async function loadLeads() {
@@ -64,11 +69,14 @@ export default function LeadsPage() {
     })),
   ];
 
-  const qualifiedCount = leads.filter(
+  // Janela de data aplicada antes dos filtros de conteúdo: KPIs e tabela refletem o período.
+  const leadsInRange = filterByDateRange(leads, dateRange);
+
+  const qualifiedCount = leadsInRange.filter(
     (l) => isQualifiedIncome(l.monthly_income)
   ).length;
 
-  const filteredLeads = leads.filter((lead) => {
+  const filteredLeads = leadsInRange.filter((lead) => {
     if (statusFilter && lead.status !== statusFilter) return false;
     if (incomeFilter) {
       if (!lead.monthly_income) return false;
@@ -79,9 +87,7 @@ export default function LeadsPage() {
       if (income < min || income > max) return false;
     }
     if (sourceFilter && lead.source !== sourceFilter) return false;
-    if (qualifiedOnly) {
-      if (!lead.monthly_income || extractHighestIncome(lead.monthly_income) < 30000) return false;
-    }
+    if (qualifiedOnly && !isQualifiedIncome(lead.monthly_income)) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -106,7 +112,9 @@ export default function LeadsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-navy-dark">Leads</h1>
-          <p className="text-sm text-navy-50">{leads.length} leads capturados</p>
+          <p className="text-sm text-navy-50">
+            {leadsInRange.length} no período · {leads.length} no total
+          </p>
         </div>
         <button
           onClick={() => setQualifiedOnly(!qualifiedOnly)}
@@ -119,6 +127,8 @@ export default function LeadsPage() {
           Qualificados 30k+ ({qualifiedCount})
         </button>
       </div>
+
+      <DateRangePicker value={dateRange} onChange={setDateRange} />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4">
