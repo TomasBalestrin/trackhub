@@ -1,7 +1,7 @@
 # F1 — Summary
 
 **Date:** 2026-04-13
-**Status:** Code + migration escritos; deploy pendente.
+**Status:** ✅ Deployada em produção (commit 7a2bbd4 + redeploy bethel-track-asozec0bm).
 
 ## Mudanças
 
@@ -18,7 +18,20 @@ Para qualquer conversão no sistema:
 - 1 CAPI fire (server — via `/api/lead` OU `/api/tracking`, nunca ambos)
 - 1 linha em `tracking_events` (UNIQUE constraint + upsert como defesa em profundidade)
 
-## Passos de deploy (manuais)
+## Resultado do deploy (executado 2026-04-13)
+
+- Inspeção pré: 1217 rows em `tracking_events`, **zero duplicatas** de `event_id`
+- Migration aplicada via `supabase db push` (UNIQUE INDEX criado limpo)
+- Constraint validada com sentinel: insert duplicado → erro 23505 esperado; upsert ignoreDuplicates → 0 rows retornados ✅
+- Deploy Vercel: 1ª tentativa falhou (CRON_SECRET com `\n` trailing); fix via `vercel env rm/add`; 2ª tentativa OK em 22s
+- Smoke test em prod: 2 POSTs com mesmo event_id em `/api/tracking` → 1 row no DB ✅
+- Aliased: https://bethel-track.vercel.app
+
+Validação ainda recomendada em uso real:
+- Submeter lead via LeadForm interno e checar Meta Events Manager (Lead aparece 1x, não 2x)
+- Submeter lead via Framer + tracker.js e checar idem
+
+## Passos manuais (registro histórico)
 
 1. **Inspecionar duplicatas existentes em produção:**
    ```sql

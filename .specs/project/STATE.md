@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** F1 + F2 implementadas; deploy manual F1 + teste pós-deploy pendentes.
+**Current Work:** F1 + F2 deployadas em produção (https://bethel-track.vercel.app). Marco 1 do roadmap concluído.
 
 ---
 
@@ -45,7 +45,19 @@ _(nenhum no momento)_
 
 ## Lessons Learned
 
-_(a popular conforme o trabalho avança)_
+### L-001: `CREATE INDEX CONCURRENTLY` incompatível com Supabase migrations (2026-04-13)
+
+**Context:** F1 deploy
+**Problem:** Migration usando `CREATE INDEX CONCURRENTLY` falha porque Supabase aplica migrations dentro de transação e Postgres não permite CONCURRENTLY em tx block.
+**Solution:** Para tabelas pequenas (~milhares), usar `CREATE INDEX` regular — lock de escrita é desprezível. Para tabelas grandes, aplicar índice fora do migration system (psql direto ou Supabase Studio SQL).
+**Prevents:** Deploy quebrado por incompatibilidade silenciosa entre PostgreSQL e Supabase migration runner.
+
+### L-002: Vercel valida secrets em env vars quando há crons em vercel.json (2026-04-13)
+
+**Context:** F1 deploy quebrou logo após adicionar `vercel.json` com cron declarativo
+**Problem:** `CRON_SECRET` no Vercel tinha `\n` literal (interpretado como newline) no valor armazenado. Sem cron declarado, Vercel não validava; ao declarar, validação rejeitou: "leading or trailing whitespace not allowed in HTTP header values".
+**Solution:** `vercel env rm` + `printf "value" | vercel env add` (sem newline trailing).
+**Prevents:** Deploys quebrados ao adicionar features de infra que ativam validações latentes em env vars antigos.
 
 ---
 
@@ -76,7 +88,7 @@ _(a popular conforme o trabalho avança)_
 - [x] ~~Q3: Criar `vercel.json` com crons~~ (`.specs/quick/003-vercel-json-crons/`)
 - [x] ~~Q4: Segregar `WEBHOOK_SECRET`~~ — server OK; ops pendente (`.specs/quick/004-split-webhook-secret/`)
 - [ ] **Ops (Q4):** gerar `WEBHOOK_SECRET` aleatório, setar em Vercel, atualizar 3 Apps Scripts, rotacionar também `CRON_SECRET` (está em curl do README)
-- [x] ~~F1: Dedup `event_id` Pixel↔CAPI — código e migration prontos~~ (`.specs/features/f1-dedup-pixel-capi/`). **Deploy manual pendente:** inspecionar duplicatas, rodar migration, validar pós-deploy.
+- [x] ~~F1: Dedup `event_id` Pixel↔CAPI — DEPLOYADA EM PROD~~. Zero duplicatas pré-existentes (1217 rows escaneadas). UNIQUE INDEX criado, smoke test confirmou dedup (id duplicado POSTado → 1 row no DB). Validação Meta Events Manager pendente em uso real.
 - [x] ~~F2: Zod schemas em `fetchCampaigns`~~ (`.specs/features/f2-zod-meta-responses/`). Insights route fica para entrega futura.
 
 ---
