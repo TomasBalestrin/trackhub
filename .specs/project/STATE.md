@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** F1 + F2 deployadas em produção (https://bethel-track.vercel.app). Marco 1 do roadmap concluído.
+**Current Work:** F3 (Vitest + 52 testes críticos) implementado. Marco 2 iniciado.
 
 ---
 
@@ -90,6 +90,7 @@ _(nenhum no momento)_
 - [ ] **Ops (Q4):** gerar `WEBHOOK_SECRET` aleatório, setar em Vercel, atualizar 3 Apps Scripts, rotacionar também `CRON_SECRET` (está em curl do README)
 - [x] ~~F1: Dedup `event_id` Pixel↔CAPI — DEPLOYADA EM PROD~~. Zero duplicatas pré-existentes (1217 rows escaneadas). UNIQUE INDEX criado, smoke test confirmou dedup (id duplicado POSTado → 1 row no DB). Validação Meta Events Manager pendente em uso real.
 - [x] ~~F2: Zod schemas em `fetchCampaigns`~~ (`.specs/features/f2-zod-meta-responses/`). Insights route fica para entrega futura.
+- [x] ~~F3: Vitest + 52 testes em qualification/validation/capi~~ (`.specs/features/f3-vitest-critical-tests/`). Cobertura em marketing-api/tracking/integration fica para iteração futura.
 
 ---
 
