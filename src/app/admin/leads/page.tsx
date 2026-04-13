@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { getScoreLabel, extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import { filterByDateRange } from "@/lib/date-range";
 import { useSharedDateRange } from "@/hooks/useSharedDateRange";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import type { Lead, LeadStatus } from "@/types/lead";
 import { INCOME_OPTIONS } from "@/types/lead";
 
@@ -48,16 +49,18 @@ export default function LeadsPage() {
   const [qualifiedOnly, setQualifiedOnly] = useState(false);
   const [dateRange, setDateRange] = useSharedDateRange();
 
-  useEffect(() => {
-    async function loadLeads() {
-      const res = await fetch("/api/admin/leads");
-      const data = await res.json();
+  async function loadLeads() {
+    const res = await fetch("/api/admin/leads");
+    const data = await res.json();
+    setLeads((data as Lead[]) || []);
+    setLoading(false);
+  }
 
-      setLeads((data as Lead[]) || []);
-      setLoading(false);
-    }
+  useEffect(() => {
     loadLeads();
   }, []);
+
+  useAutoRefresh(loadLeads, 60_000);
 
   // Build source options from data
   const sourceOptions = [

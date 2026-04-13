@@ -8,6 +8,7 @@ import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import { filterByDateRange } from "@/lib/date-range";
 import { useSharedDateRange } from "@/hooks/useSharedDateRange";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import type { Lead } from "@/types/lead";
 
 // ---------------------------------------------------------------------------
@@ -168,6 +169,8 @@ export default function AdsPage() {
   useEffect(() => {
     fetchData(dateRange.start, dateRange.end);
   }, [dateRange.start, dateRange.end, fetchData]);
+
+  useAutoRefresh(() => fetchData(dateRange.start, dateRange.end), 60_000);
 
   // ---------------------------------------------------------------------------
   // Derived values

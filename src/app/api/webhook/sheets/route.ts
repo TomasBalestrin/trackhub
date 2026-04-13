@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { calculateQualificationScore } from "@/lib/lead/qualification";
+import { sendCAPIEvent } from "@/lib/meta/capi";
 import { log } from "@/lib/log";
 
 /**
@@ -174,6 +175,7 @@ export async function POST(request: NextRequest) {
         // Vincular eventos de tracking ao lead e preencher timestamps de conversão
         const leadFbc = lead.fbc || trackData.fbc || null;
         const leadFbp = lead.fbp || trackData.fbp || null;
+        const eventIdFields: Record<string, string> = {};
 
         if (leadFbc || leadFbp) {
           // Buscar eventos recentes com mesmo fbc/fbp (últimas 24h)
@@ -202,7 +204,6 @@ export async function POST(request: NextRequest) {
 
             // Preencher timestamps de conversão no lead
             const timestamps: Record<string, string> = {};
-            const eventIdFields: Record<string, string> = {};
 
             for (const event of events) {
               if (event.event_name === "PageView" && !timestamps.page_view_at) {
@@ -227,6 +228,69 @@ export async function POST(request: NextRequest) {
                 .eq("id", inserted.id);
             }
           }
+        }
+
+        // Dispara CAPI Lead pra Meta atribuir esse lead ao adset/ad correto.
+        // Apps Script (Lead Ads → planilha) raramente traz fbc/fbp;
+        // mesmo assim Meta pode fazer match por email/phone hash + IP.
+        try {
+          const capiFbc = lead.fbc || trackData.fbc || null;
+          const capiFbp = lead.fbp || trackData.fbp || null;
+          const eventIdLead =
+            eventIdFields.event_id_lead ||
+            (typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `sheet-${inserted.id}`);
+
+          // Se ainda não há tracking_event Lead, cria um agora pra dedupe
+          if (!eventIdFields.event_id_lead) {
+            await supabase.from("tracking_events").upsert(
+              {
+                lead_id: inserted.id,
+                event_name: "Lead",
+                event_id: eventIdLead,
+                event_source: "server",
+                event_time: new Date().toISOString(),
+                fbc: capiFbc,
+                fbp: capiFbp,
+                payload: { origin: "webhook/sheets" },
+              },
+              { onConflict: "event_id", ignoreDuplicates: true }
+            );
+            await supabase
+              .from("leads")
+              .update({ event_id_lead: eventIdLead, lead_at: new Date().toISOString() })
+              .eq("id", inserted.id);
+          }
+
+          const nameParts = lead.full_name.trim().split(/\s+/);
+          sendCAPIEvent({
+            event_name: "Lead",
+            event_id: eventIdLead,
+            event_time: Math.floor(Date.now() / 1000),
+            event_source_url: lead.tracker_url || trackData.landing_page_url || process.env.NEXT_PUBLIC_BASE_URL || "",
+            user_data: {
+              email: emailNormalized,
+              phone: (lead.phone || "").replace(/\D/g, ""),
+              first_name: nameParts[0],
+              last_name: nameParts.slice(1).join(" "),
+              city: lead.city || undefined,
+              state: lead.state || undefined,
+              fbc: capiFbc || undefined,
+              fbp: capiFbp || undefined,
+            },
+            custom_data: {
+              currency: "BRL",
+              value: 0,
+              content_name: "Sheets Lead",
+              content_category: "lead_capture",
+              qualification_score: qualificationScore,
+            },
+          }).catch((err) =>
+            log.error({ err, route: "/api/webhook/sheets", phase: "capi" }, "CAPI Lead failed")
+          );
+        } catch (err) {
+          log.error({ err, route: "/api/webhook/sheets", phase: "capi-prep" }, "CAPI prep failed");
         }
 
         results.push({ success: true, id: inserted.id, email: lead.email });

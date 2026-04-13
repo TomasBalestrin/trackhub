@@ -10,6 +10,7 @@ import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
 import { filterByDateRange } from "@/lib/date-range";
 import { useSharedDateRange } from "@/hooks/useSharedDateRange";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import type { Lead } from "@/types/lead";
 
 interface InsightsRow {
@@ -73,6 +74,11 @@ export default function PremiumDashboard() {
   useEffect(() => {
     fetchInsights();
   }, [dateRange.start, dateRange.end]);
+
+  useAutoRefresh(() => {
+    fetchLeads();
+    fetchInsights();
+  }, 60_000);
 
   async function fetchLeads() {
     const res = await fetch("/api/admin/leads");

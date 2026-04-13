@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { useSharedDateRange } from "@/hooks/useSharedDateRange";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 interface AdInsight {
   ad_name: string;
