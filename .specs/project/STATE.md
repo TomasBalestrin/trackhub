@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** F3 + F4 implementados. Marco 2 quase completo (falta F5 rate limit).
+**Current Work:** F3 + F4 + F6 em prod (F5 adiado). Marco 2 + parte do 3.
 
 ---
 
@@ -20,6 +20,13 @@
 **Reason:** Brownfield real, stack definida, produção ativa — exercita todas as fases do framework.
 **Trade-off:** Adiar benefícios em outros projetos até validar aqui.
 **Impact:** Aprendizado do piloto vira base para adotar nos demais.
+
+### AD-005: Vercel Cron em vez de pg_cron para cleanup (2026-04-13)
+
+**Decision:** Cleanup de `tracking_cache` via rota `/api/cron/cleanup-tracking-cache` + entry em `vercel.json` crons, não via `pg_cron` do Supabase.
+**Reason:** Consistência com `/api/cron/sync-campaigns` existente; logs estruturados via pino (F4) visíveis em Vercel Logs; debug manual simples via GET autenticado.
+**Trade-off:** Uma invocação HTTP adicional por dia (desprezível); dependência de Vercel estar up para manutenção do DB (aceitável).
+**Impact:** Rotas de cron agora são o padrão pra cleanups. Políticas de retenção de `tracking_events` (quando definidas) vão pelo mesmo caminho.
 
 ### AD-004: Separação client-only Pixel / server-only CAPI (2026-04-13)
 
@@ -92,6 +99,8 @@ _(nenhum no momento)_
 - [x] ~~F2: Zod schemas em `fetchCampaigns`~~ (`.specs/features/f2-zod-meta-responses/`). Insights route fica para entrega futura.
 - [x] ~~F3: Vitest + 52 testes em qualification/validation/capi~~ (`.specs/features/f3-vitest-critical-tests/`). Cobertura em marketing-api/tracking/integration fica para iteração futura.
 - [x] ~~F4: Logger pino estruturado~~ (`.specs/features/f4-pino-logger/`). Todas as rotas server-side migradas; deploy + verificação Vercel Logs pendentes.
+- [ ] F5: Rate limit `/api/tracking` — **adiado**. Alternativa leve: Vercel Firewall (rate limit por IP no dashboard, sem código). Decidir depois se tráfego abusivo aparecer.
+- [x] ~~F6: Cron de cleanup `tracking_cache` (TTL 7 dias)~~ (`.specs/features/f6-cleanup-tracking-cache/`). Vercel Cron daily 03:00 UTC.
 
 ---
 
