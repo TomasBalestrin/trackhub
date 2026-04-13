@@ -181,6 +181,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const type = (searchParams.get("type") || "overview") as InsightType;
     const datePreset = searchParams.get("date_preset") || "last_7d";
+    const since = searchParams.get("since");
+    const until = searchParams.get("until");
     const campaignFilter = searchParams.get("campaign_filter");
 
     if (!TYPE_CONFIGS[type]) {
@@ -190,7 +192,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!VALID_DATE_PRESETS.includes(datePreset)) {
+    const useTimeRange = Boolean(since && until);
+    if (!useTimeRange && !VALID_DATE_PRESETS.includes(datePreset)) {
       return NextResponse.json(
         { error: `Invalid date_preset: ${datePreset}. Must be one of: ${VALID_DATE_PRESETS.join(", ")}` },
         { status: 400 }
@@ -202,9 +205,17 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams({
       level: config.level,
       fields: config.fields,
-      date_preset: datePreset,
       limit: String(DEFAULT_LIMIT),
     });
+
+    if (useTimeRange) {
+      // since/until são ISO timestamps; Meta espera YYYY-MM-DD
+      const sinceDate = new Date(since!).toISOString().slice(0, 10);
+      const untilDate = new Date(new Date(until!).getTime() - 1).toISOString().slice(0, 10);
+      params.set("time_range", JSON.stringify({ since: sinceDate, until: untilDate }));
+    } else {
+      params.set("date_preset", datePreset);
+    }
 
     if (config.breakdowns) {
       params.set("breakdowns", config.breakdowns);

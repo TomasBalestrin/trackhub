@@ -8,7 +8,8 @@ import { Select } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { formatDate } from "@/lib/utils";
 import { getScoreLabel, extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
-import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
+import { filterByDateRange } from "@/lib/date-range";
+import { useSharedDateRange } from "@/hooks/useSharedDateRange";
 import type { Lead, LeadStatus } from "@/types/lead";
 import { INCOME_OPTIONS } from "@/types/lead";
 
@@ -45,9 +46,7 @@ export default function LeadsPage() {
   const [incomeFilter, setIncomeFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [qualifiedOnly, setQualifiedOnly] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange>(() =>
-    presetToRange("last_30d", "created_at")
-  );
+  const [dateRange, setDateRange] = useSharedDateRange();
 
   useEffect(() => {
     async function loadLeads() {
@@ -128,7 +127,7 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      <DateRangePicker value={dateRange} onChange={setDateRange} />
+      <DateRangePicker value={dateRange} onChange={setDateRange} align="left" />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4">

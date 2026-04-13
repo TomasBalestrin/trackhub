@@ -9,7 +9,8 @@ import { formatDate } from "@/lib/utils";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
-import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
+import { filterByDateRange } from "@/lib/date-range";
+import { useSharedDateRange } from "@/hooks/useSharedDateRange";
 import type { MetaCampaignCache } from "@/types/lead";
 
 interface LeadData {
@@ -29,6 +30,8 @@ interface LeadData {
   utm_source: string | null;
   utm_campaign: string | null;
   utm_content: string | null;
+  _adId?: string | null;
+  _adsetId?: string | null;
 }
 
 interface CampaignGroup {
@@ -143,9 +146,7 @@ export default function CampaignsPage() {
   const [period, setPeriod] = useState("last_7d");
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [expandedAdset, setExpandedAdset] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange>(() =>
-    presetToRange("last_30d", "created_at")
-  );
+  const [dateRange, setDateRange] = useSharedDateRange();
   const { formatBRL } = useExchangeRate();
 
   useEffect(() => {
@@ -166,6 +167,31 @@ export default function CampaignsPage() {
     const rawLeads = (data.leads || []) as LeadData[];
     // Filtra leads pelo período escolhido antes de agrupar por campanha.
     const leadsData = filterByDateRange(rawLeads, dateRange);
+
+    // Build name → { ad_id, adset_id } map from cache so we can attribute
+    // leads via ad_name OR utm_content even when lead.adset_name is null.
+    const adByName = new Map<string, { ad_id: string | null; adset_id: string | null }>();
+    campaignsData.forEach((c) => {
+      if (c.ad_name) adByName.set(c.ad_name.trim().toLowerCase(), { ad_id: c.ad_id, adset_id: c.adset_id });
+    });
+    const adsetByName = new Map<string, string>();
+    adsetsData.forEach((a) => {
+      if (a.adset_name) adsetByName.set(a.adset_name.trim().toLowerCase(), a.adset_id);
+    });
+
+    function deriveLeadIds(lead: LeadData): { adId: string | null; adsetId: string | null } {
+      const candidates = [lead.ad_name, lead.utm_content].filter(Boolean) as string[];
+      for (const name of candidates) {
+        const hit = adByName.get(name.trim().toLowerCase());
+        if (hit) return { adId: hit.ad_id, adsetId: hit.adset_id };
+      }
+      // Fallback: only adset_name match
+      if (lead.adset_name) {
+        const aid = adsetByName.get(lead.adset_name.trim().toLowerCase());
+        if (aid) return { adId: null, adsetId: aid };
+      }
+      return { adId: null, adsetId: null };
+    }
 
     // Group by campaign_name
     const grouped: Record<string, CampaignGroup> = {};
@@ -193,8 +219,11 @@ export default function CampaignsPage() {
       if (c.status === "ACTIVE") grouped[name].status = "ACTIVE";
     });
 
-    // Assign leads to campaigns
+    // Assign leads to campaigns + derive ad_id/adset_id from name map
     leadsData.forEach((lead) => {
+      const { adId, adsetId } = deriveLeadIds(lead);
+      lead._adId = adId;
+      lead._adsetId = adsetId;
       const name = lead.campaign_name || lead.utm_campaign || "";
       if (grouped[name]) {
         grouped[name].leads.push(lead);
@@ -420,15 +449,16 @@ export default function CampaignsPage() {
           const isExpanded = expandedCampaign === campaign.campaign_name;
 
           return (
-            <div key={campaign.campaign_name} className="rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] overflow-hidden bg-white">
+            <div key={campaign.campaign_name} className={`rounded-[var(--radius-lg)] overflow-hidden bg-white transition-all ${isExpanded ? "shadow-[var(--shadow-md)] ring-2 ring-gold" : "shadow-[var(--shadow-sm)]"}`}>
               {/* Campaign Header */}
               <button
                 onClick={() => setExpandedCampaign(isExpanded ? null : campaign.campaign_name)}
-                className="w-full text-left p-5 hover:bg-gray-50 transition-colors"
+                className={`w-full text-left p-5 transition-colors ${isExpanded ? "bg-gold/5" : "hover:bg-gray-50"}`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
+                      <span className={`text-navy-50 transition-transform ${isExpanded ? "rotate-90 text-gold" : ""}`}>▶</span>
                       <h3 className="text-base font-semibold text-navy-dark">{campaign.campaign_name}</h3>
                       <Badge variant={campaign.status === "ACTIVE" ? "success" : campaign.status === "PAUSED" ? "warning" : "default"}>
                         {campaign.status === "ACTIVE" ? "Ativa" : campaign.status === "PAUSED" ? "Pausada" : "Desativada"}
@@ -546,7 +576,7 @@ export default function CampaignsPage() {
                             const adsInAdset = campaign.ads.filter((ad) => ad.adset_id === adset.adset_id);
                             const isAdsetExpanded = expandedAdset === adset.adset_id;
                             const leadsInAdset = campaign.leads.filter(
-                              (l) => l.adset_name === adset.adset_name
+                              (l) => l._adsetId === adset.adset_id
                             );
                             const qualifiedInAdset = leadsInAdset.filter((l) =>
                               isQualifiedIncome(l.monthly_income)
@@ -556,17 +586,18 @@ export default function CampaignsPage() {
                             const cpl = ai?.cost_per_lead ?? (leadsCount > 0 ? spend / leadsCount : 0);
                             const ctr = ai ? parseFloat(ai.ctr || "0") : 0;
                             return (
-                              <div key={adset.adset_id} className="rounded-md border border-gray-200 overflow-hidden">
+                              <div key={adset.adset_id} className={`rounded-md overflow-hidden transition-all ${isAdsetExpanded ? "border-2 border-gold shadow-[var(--shadow-sm)]" : "border border-gray-200"}`}>
                                 <button
                                   type="button"
                                   onClick={() =>
                                     setExpandedAdset(isAdsetExpanded ? null : adset.adset_id)
                                   }
-                                  className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  className={`w-full text-left px-3 py-2 transition-colors ${isAdsetExpanded ? "bg-gold/10" : "bg-gray-50 hover:bg-gray-100"}`}
                                 >
                                   <div className="flex items-start justify-between gap-4 flex-wrap">
                                     <div className="flex-1 min-w-[200px]">
                                       <div className="flex items-center gap-2">
+                                        <span className={`text-xs transition-transform inline-block ${isAdsetExpanded ? "rotate-90 text-gold" : "text-navy-50"}`}>▶</span>
                                         <span className="text-sm font-semibold text-navy-dark">
                                           {adset.adset_name}
                                         </span>
@@ -604,30 +635,30 @@ export default function CampaignsPage() {
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-4 text-right">
-                                      <div>
-                                        <p className="text-xs text-navy-50">Leads</p>
-                                        <p className="text-sm font-bold text-navy-dark">{leadsCount}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs text-navy-50">Qualif. 30k+</p>
-                                        <p className={`text-sm font-bold ${qualifiedInAdset > 0 ? "text-success" : "text-navy-30"}`}>
+                                    <div className="flex items-center gap-4 text-right shrink-0">
+                                      <div className="w-14">
+                                        <p className="text-xs text-navy-50">Qualif</p>
+                                        <p className={`text-sm font-bold ${qualifiedInAdset > 0 ? "text-gold" : "text-navy-30"}`}>
                                           {qualifiedInAdset}
                                         </p>
                                       </div>
-                                      <div>
+                                      <div className="w-14">
+                                        <p className="text-xs text-navy-50">Leads</p>
+                                        <p className="text-sm font-bold text-navy-dark">{leadsCount}</p>
+                                      </div>
+                                      <div className="w-24">
                                         <p className="text-xs text-navy-50">Gasto</p>
                                         <p className="text-sm font-bold text-navy-dark">
                                           {spend > 0 ? formatBRL(spend) : "—"}
                                         </p>
                                       </div>
-                                      <div>
+                                      <div className="w-20">
                                         <p className="text-xs text-navy-50">CPL</p>
                                         <p className="text-sm font-bold text-navy-dark">
                                           {cpl > 0 ? formatBRL(cpl) : "—"}
                                         </p>
                                       </div>
-                                      <div>
+                                      <div className="w-16">
                                         <p className="text-xs text-navy-50">CTR</p>
                                         <p className="text-sm font-bold text-navy-dark">
                                           {ctr.toFixed(2)}%
@@ -721,18 +752,18 @@ export default function CampaignsPage() {
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Anúncio</th>
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Tipo</th>
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Status</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Qualif</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Leads</th>
                                               <th className="text-right px-3 py-2 font-medium text-navy-70">Impr.</th>
                                               <th className="text-right px-3 py-2 font-medium text-navy-70">Gasto</th>
                                               <th className="text-right px-3 py-2 font-medium text-navy-70">CTR</th>
-                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Leads</th>
                                               <th className="text-right px-3 py-2 font-medium text-navy-70">CPL</th>
-                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Qualif. 30k+</th>
                                             </tr>
                                           </thead>
                                           <tbody>
                                             {adsInAdset.map((ad) => {
                                               const leadsInAd = leadsInAdset.filter(
-                                                (l) => l.ad_name === ad.ad_name
+                                                (l) => l._adId === ad.ad_id
                                               );
                                               const qualifiedInAd = leadsInAd.filter((l) =>
                                                 isQualifiedIncome(l.monthly_income)
@@ -758,14 +789,8 @@ export default function CampaignsPage() {
                                                       {ad.status || "N/A"}
                                                     </Badge>
                                                   </td>
-                                                  <td className="px-3 py-2 text-right text-navy-70">
-                                                    {adImpressions > 0 ? adImpressions.toLocaleString("pt-BR") : "—"}
-                                                  </td>
-                                                  <td className="px-3 py-2 text-right text-navy-70">
-                                                    {adSpend > 0 ? formatBRL(adSpend) : "—"}
-                                                  </td>
-                                                  <td className="px-3 py-2 text-right text-navy-70">
-                                                    {adCtr > 0 ? `${adCtr.toFixed(2)}%` : "—"}
+                                                  <td className={`px-3 py-2 text-right font-bold ${qualifiedInAd > 0 ? "text-gold" : "text-navy-30"}`}>
+                                                    {qualifiedInAd}
                                                   </td>
                                                   <td className="px-3 py-2 text-right text-navy-70">
                                                     {leadsInAd.length}
@@ -776,10 +801,16 @@ export default function CampaignsPage() {
                                                     )}
                                                   </td>
                                                   <td className="px-3 py-2 text-right text-navy-70">
-                                                    {adCpl > 0 ? formatBRL(adCpl) : "—"}
+                                                    {adImpressions > 0 ? adImpressions.toLocaleString("pt-BR") : "—"}
                                                   </td>
-                                                  <td className={`px-3 py-2 text-right font-bold ${qualifiedInAd > 0 ? "text-success" : "text-navy-30"}`}>
-                                                    {qualifiedInAd}
+                                                  <td className="px-3 py-2 text-right text-navy-70">
+                                                    {adSpend > 0 ? formatBRL(adSpend) : "—"}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-navy-70">
+                                                    {adCtr > 0 ? `${adCtr.toFixed(2)}%` : "—"}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-navy-70">
+                                                    {adCpl > 0 ? formatBRL(adCpl) : "—"}
                                                   </td>
                                                 </tr>
                                               );

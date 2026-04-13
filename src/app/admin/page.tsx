@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
-import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
+import { filterByDateRange } from "@/lib/date-range";
+import { useSharedDateRange } from "@/hooks/useSharedDateRange";
 import type { Lead } from "@/types/lead";
 
 interface InsightsRow {
@@ -49,13 +49,6 @@ interface InsightsResponse {
   };
 }
 
-const PERIOD_OPTIONS = [
-  { value: "today", label: "Hoje" },
-  { value: "last_7d", label: "7 dias" },
-  { value: "last_14d", label: "14 dias" },
-  { value: "last_30d", label: "30 dias" },
-];
-
 function extractLeads(row: InsightsRow): number {
   if (row.leads && row.leads > 0) return row.leads;
   const action = (row.actions || []).find((a) => a.action_type === "lead");
@@ -71,10 +64,7 @@ export default function PremiumDashboard() {
   const [hourly, setHourly] = useState<InsightsRow[]>([]);
   const [placements, setPlacements] = useState<InsightsRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState("last_7d");
-  const [dateRange, setDateRange] = useState<DateRange>(() =>
-    presetToRange("last_30d", "created_at")
-  );
+  const [dateRange, setDateRange] = useSharedDateRange();
 
   useEffect(() => {
     fetchLeads();
@@ -82,7 +72,7 @@ export default function PremiumDashboard() {
 
   useEffect(() => {
     fetchInsights();
-  }, [period]);
+  }, [dateRange.start, dateRange.end]);
 
   async function fetchLeads() {
     const res = await fetch("/api/admin/leads");
@@ -93,12 +83,15 @@ export default function PremiumDashboard() {
   async function fetchInsights() {
     setLoading(true);
     try {
+      const range = dateRange.start && dateRange.end
+        ? `since=${encodeURIComponent(dateRange.start)}&until=${encodeURIComponent(dateRange.end)}`
+        : "date_preset=last_30d";
       const [ovRes, dailyRes, campRes, hourRes, placeRes] = await Promise.all([
-        fetch(`/api/admin/insights?type=overview&date_preset=${period}`),
-        fetch(`/api/admin/insights?type=daily&date_preset=${period}`),
-        fetch(`/api/admin/insights?type=campaigns&date_preset=${period}`),
+        fetch(`/api/admin/insights?type=overview&${range}`),
+        fetch(`/api/admin/insights?type=daily&${range}`),
+        fetch(`/api/admin/insights?type=campaigns&${range}`),
         fetch(`/api/admin/insights?type=hourly&date_preset=last_7d`),
-        fetch(`/api/admin/insights?type=placements&date_preset=${period}`),
+        fetch(`/api/admin/insights?type=placements&${range}`),
       ]);
       const [ovData, dailyData, campData, hourData, placeData] = await Promise.all([
         ovRes.json(),
@@ -244,7 +237,6 @@ export default function PremiumDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
-          <Select options={PERIOD_OPTIONS} value={period} onChange={(e) => setPeriod(e.target.value)} />
         </div>
       </div>
 
@@ -381,7 +373,7 @@ export default function PremiumDashboard() {
       {/* Row 3: Daily Chart + Status */}
       <div className="grid lg:grid-cols-3 gap-4">
         {/* Daily Chart */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 overflow-hidden">
           <div className="flex items-center justify-between">
             <CardTitle>Gasto vs Leads por Dia</CardTitle>
             <div className="flex items-center gap-4 text-xs">
@@ -389,7 +381,7 @@ export default function PremiumDashboard() {
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gold inline-block" /> Leads</span>
             </div>
           </div>
-          <div className="mt-4 flex items-end gap-1 h-40">
+          <div className="mt-4 flex items-end gap-1 h-40 w-full min-w-0 overflow-x-auto">
             {daily.map((d, i) => {
               const spend = parseFloat(d.spend || "0");
               const dLeads = extractLeads(d);
@@ -398,7 +390,7 @@ export default function PremiumDashboard() {
               const date = d.date_start?.split("-").slice(1).join("/") || "";
 
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                <div key={i} className="flex-1 min-w-[14px] flex flex-col items-center gap-1 group relative">
                   <div className="w-full flex items-end gap-0.5" style={{ height: "120px" }}>
                     <div
                       className="flex-1 bg-navy-15 rounded-t transition-all hover:bg-navy-30"

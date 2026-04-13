@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
-import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
+import { filterByDateRange } from "@/lib/date-range";
+import { useSharedDateRange } from "@/hooks/useSharedDateRange";
 import type { Lead } from "@/types/lead";
 
 /* ------------------------------------------------------------------ */
@@ -322,9 +323,7 @@ export default function AlertasPage() {
     bestCampaign: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRange>(() =>
-    presetToRange("last_30d", "created_at")
-  );
+  const [dateRange, setDateRange] = useSharedDateRange();
 
   useEffect(() => {
     async function load() {

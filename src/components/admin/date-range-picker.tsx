@@ -19,6 +19,7 @@ interface Props {
   value: DateRange;
   onChange: (range: DateRange) => void;
   className?: string;
+  align?: "left" | "right";
 }
 
 // Presets exibidos no sidebar, nesta ordem (espelha o modelo escolhido pelo usuário).
@@ -52,7 +53,7 @@ function dateFromRangeEndInclusive(end: string | null): Date | null {
   return end ? new Date(new Date(end).getTime() - 1) : null;
 }
 
-export function DateRangePicker({ value, onChange, className }: Props) {
+export function DateRangePicker({ value, onChange, className, align = "right" }: Props) {
   const [open, setOpen] = useState(false);
   const today = useMemo(() => new Date(), []);
   const initialMonth = dateFromRangeStart(value.start) ?? today;
@@ -140,6 +141,7 @@ export function DateRangePicker({ value, onChange, className }: Props) {
         <div
           className={cn(
             "absolute z-50 mt-2 flex rounded-lg overflow-hidden shadow-xl",
+            align === "right" ? "right-0" : "left-0",
             "bg-navy-dark text-white border border-navy"
           )}
           style={{ minWidth: 540 }}

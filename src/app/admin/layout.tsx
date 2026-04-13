@@ -20,7 +20,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-navy-dark text-white flex flex-col shrink-0">
+      <aside className="w-64 bg-navy-dark text-white flex flex-col shrink-0 sticky top-0 h-screen overflow-y-auto">
         <div className="p-6 border-b border-white/10">
           <h2 className="text-lg font-bold">Bethel Track</h2>
           <span className="text-xs text-gold uppercase tracking-widest">Admin</span>

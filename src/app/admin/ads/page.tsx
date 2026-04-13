@@ -7,7 +7,8 @@ import { Select } from "@/components/ui/select";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { extractHighestIncome, isQualifiedIncome } from "@/lib/lead/qualification";
-import { filterByDateRange, presetToRange, type DateRange } from "@/lib/date-range";
+import { filterByDateRange } from "@/lib/date-range";
+import { useSharedDateRange } from "@/hooks/useSharedDateRange";
 import type { Lead } from "@/types/lead";
 
 // ---------------------------------------------------------------------------
@@ -90,9 +91,7 @@ export default function AdsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange>(() =>
-    presetToRange("last_30d", "created_at")
-  );
+  const [dateRange, setDateRange] = useSharedDateRange();
 
   const fetchData = useCallback(async (p: Period) => {
     setLoading(true);
