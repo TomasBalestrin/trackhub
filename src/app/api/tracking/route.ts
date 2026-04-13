@@ -49,25 +49,29 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Log tracking event with full UTM data
-    await supabase.from("tracking_events").insert({
-      event_name,
-      event_id,
-      event_source: "server",
-      event_time: new Date().toISOString(),
-      fbclid: fbclid || utm_data?.fbclid || null,
-      fbc: fbc || null,
-      fbp: fbp || null,
-      ip_address: ip,
-      user_agent: userAgent,
-      payload: {
-        ...(user_data || {}),
-        ...(utm_data || {}),
-        ...(extra || {}),
-        url: url || null,
-        referrer: referrer || null,
+    // Upsert garante idempotência: retries/duplicações com mesmo event_id
+    // não geram linhas duplicadas (UNIQUE INDEX em tracking_events.event_id).
+    await supabase.from("tracking_events").upsert(
+      {
+        event_name,
+        event_id,
+        event_source: "server",
+        event_time: new Date().toISOString(),
+        fbclid: fbclid || utm_data?.fbclid || null,
+        fbc: fbc || null,
+        fbp: fbp || null,
+        ip_address: ip,
+        user_agent: userAgent,
+        payload: {
+          ...(user_data || {}),
+          ...(utm_data || {}),
+          ...(extra || {}),
+          url: url || null,
+          referrer: referrer || null,
+        },
       },
-    });
+      { onConflict: "event_id", ignoreDuplicates: true }
+    );
 
     // Send to CAPI (async)
     sendCAPIEvent({

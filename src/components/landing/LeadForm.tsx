@@ -6,14 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { INCOME_OPTIONS, HOW_FOUND_OPTIONS, BRAZILIAN_STATES } from "@/types/lead";
 import { useUTMParams } from "@/hooks/useUTMParams";
-import { useMetaPixel } from "@/hooks/useMetaPixel";
+import { trackPixelEvent } from "@/lib/meta/pixel";
+import { generateEventId } from "@/lib/tracking/events";
 import { formatPhone } from "@/lib/utils";
 
 const STATE_OPTIONS = BRAZILIAN_STATES.map((s) => ({ value: s, label: s }));
 
 export function LeadForm() {
   const utmParams = useUTMParams();
-  const { fireEvent, generateEventId } = useMetaPixel();
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -91,19 +91,9 @@ export function LeadForm() {
       const data = await response.json();
 
       if (data.success) {
-        // Fire Lead event via Pixel + CAPI
-        fireEvent("Lead", {
-          eventId: eventIdLead,
-          fbclid: utmParams.fbclid,
-          fbc: utmParams.fbc,
-          fbp: utmParams.fbp,
-          userData: {
-            em: formData.email,
-            ph: formData.phone,
-            fn: formData.full_name.split(" ")[0],
-            ln: formData.full_name.split(" ").slice(1).join(" "),
-          },
-        });
+        // Client-side Pixel only; server-side CAPI já foi disparado por /api/lead
+        // com o mesmo eventIdLead (dedup garantida por event_id).
+        trackPixelEvent("Lead", eventIdLead);
 
         // Store eventId for thank-you page
         sessionStorage.setItem("bethel_event_id_complete", eventIdComplete);

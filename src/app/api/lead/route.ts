@@ -76,53 +76,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert tracking event
+    // Insert tracking event + dispatch CAPI only when client passed event_id_lead.
+    // Sem event_id_lead, o Pixel-side fire teria id diferente — melhor pular CAPI
+    // do que gerar id órfão que quebra a deduplicação.
     if (body.event_id_lead) {
-      await supabase.from("tracking_events").insert({
-        lead_id: lead.id,
+      await supabase
+        .from("tracking_events")
+        .upsert(
+          {
+            lead_id: lead.id,
+            event_name: "Lead",
+            event_id: body.event_id_lead,
+            event_source: "server",
+            event_time: new Date().toISOString(),
+            fbclid: data.fbclid || null,
+            fbc: data.fbc || null,
+            fbp: data.fbp || null,
+            ip_address: ip,
+            user_agent: userAgent,
+            payload: {
+              monthly_income: data.monthly_income,
+              qualification_score: qualificationScore,
+            },
+          },
+          { onConflict: "event_id", ignoreDuplicates: true }
+        );
+
+      const nameParts = data.full_name.trim().split(/\s+/);
+      sendCAPIEvent({
         event_name: "Lead",
         event_id: body.event_id_lead,
-        event_source: "server",
-        event_time: new Date().toISOString(),
-        fbclid: data.fbclid || null,
-        fbc: data.fbc || null,
-        fbp: data.fbp || null,
-        ip_address: ip,
-        user_agent: userAgent,
-        payload: {
-          monthly_income: data.monthly_income,
+        event_time: Math.floor(Date.now() / 1000),
+        event_source_url: data.landing_page_url || process.env.NEXT_PUBLIC_BASE_URL || "",
+        user_data: {
+          email: data.email,
+          phone: data.phone,
+          first_name: nameParts[0],
+          last_name: nameParts.slice(1).join(" "),
+          city: data.city,
+          state: data.state,
+          client_ip_address: ip || undefined,
+          client_user_agent: userAgent || undefined,
+          fbc: data.fbc,
+          fbp: data.fbp,
+        },
+        custom_data: {
+          currency: "BRL",
+          value: 0,
+          content_name: "Aula ao Vivo",
+          content_category: "lead_capture",
           qualification_score: qualificationScore,
         },
-      });
+      }).catch((err) => console.error("CAPI Lead error:", err));
+    } else {
+      console.warn(`[/api/lead] lead ${lead.id} sem event_id_lead — CAPI não disparado`);
     }
-
-    // Send CAPI event (async - don't block response)
-    const nameParts = data.full_name.trim().split(/\s+/);
-    sendCAPIEvent({
-      event_name: "Lead",
-      event_id: body.event_id_lead || crypto.randomUUID(),
-      event_time: Math.floor(Date.now() / 1000),
-      event_source_url: data.landing_page_url || process.env.NEXT_PUBLIC_BASE_URL || "",
-      user_data: {
-        email: data.email,
-        phone: data.phone,
-        first_name: nameParts[0],
-        last_name: nameParts.slice(1).join(" "),
-        city: data.city,
-        state: data.state,
-        client_ip_address: ip || undefined,
-        client_user_agent: userAgent || undefined,
-        fbc: data.fbc,
-        fbp: data.fbp,
-      },
-      custom_data: {
-        currency: "BRL",
-        value: 0,
-        content_name: "Aula ao Vivo",
-        content_category: "lead_capture",
-        qualification_score: qualificationScore,
-      },
-    }).catch((err) => console.error("CAPI Lead error:", err));
 
     return NextResponse.json({ success: true, leadId: lead.id });
   } catch (error) {
