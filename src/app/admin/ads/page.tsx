@@ -117,9 +117,55 @@ export default function AdsPage() {
         leadsRes.json(),
       ]);
 
-      setOverview(overviewData);
-      setDaily(Array.isArray(dailyData) ? dailyData : []);
-      setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
+      const overviewRow = Array.isArray(overviewData?.data) ? overviewData.data[0] : null;
+      const overviewSummary = overviewData?.summary;
+      setOverview(
+        overviewRow
+          ? {
+              spend: Number(overviewRow.spend) || 0,
+              impressions: Number(overviewRow.impressions) || 0,
+              clicks: Number(overviewRow.clicks) || 0,
+              ctr: Number(overviewRow.ctr) || overviewSummary?.avg_ctr || 0,
+              actions: overviewRow.actions,
+            }
+          : overviewSummary
+            ? {
+                spend: overviewSummary.total_spend,
+                impressions: overviewSummary.total_impressions,
+                clicks: overviewSummary.total_clicks,
+                ctr: overviewSummary.avg_ctr,
+                actions: [],
+              }
+            : null
+      );
+
+      const dailyRows = Array.isArray(dailyData?.data) ? dailyData.data : Array.isArray(dailyData) ? dailyData : [];
+      setDaily(
+        dailyRows.map((d: Record<string, unknown>) => ({
+          date_start: String(d.date_start ?? ""),
+          spend: Number(d.spend) || 0,
+          impressions: Number(d.impressions) || 0,
+          clicks: Number(d.clicks) || 0,
+          actions: d.actions as DailyEntry["actions"],
+        }))
+      );
+
+      const campaignRows = Array.isArray(campaignsData?.data)
+        ? campaignsData.data
+        : Array.isArray(campaignsData)
+          ? campaignsData
+          : [];
+      setCampaigns(
+        campaignRows.map((c: Record<string, unknown>) => ({
+          campaign_name: String(c.campaign_name ?? ""),
+          spend: Number(c.spend) || 0,
+          impressions: Number(c.impressions) || 0,
+          clicks: Number(c.clicks) || 0,
+          ctr: Number(c.ctr) || 0,
+          actions: c.actions as CampaignEntry["actions"],
+        }))
+      );
+
       setLeads(Array.isArray(leadsData) ? leadsData : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");

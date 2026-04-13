@@ -132,14 +132,14 @@ export default function PremiumDashboard() {
   const recentLeads = filteredLeads.slice(0, 8);
 
   // Meta insights
-  const s = overview?.summary;
-  const totalSpend = s?.spend || 0;
-  const totalImpressions = s?.impressions || 0;
-  const totalClicks = s?.clicks || 0;
-  const totalReach = s?.reach || 0;
-  const metaLeads = s?.leads || 0;
-  const cpl = s?.cost_per_lead || 0;
-  const ctr = s?.ctr || 0;
+  const s = overview?.summary as Record<string, number> | undefined;
+  const totalSpend = s?.total_spend ?? s?.spend ?? 0;
+  const totalImpressions = s?.total_impressions ?? s?.impressions ?? 0;
+  const totalClicks = s?.total_clicks ?? s?.clicks ?? 0;
+  const totalReach = s?.total_reach ?? s?.reach ?? 0;
+  const metaLeads = s?.total_leads ?? s?.leads ?? 0;
+  const cpl = s?.avg_cost_per_lead ?? s?.cost_per_lead ?? 0;
+  const ctr = s?.avg_ctr ?? s?.ctr ?? 0;
 
   // Qualification rate
   const qualRate = filteredLeads.length > 0 ? Math.round((qualifiedLeads.length / filteredLeads.length) * 100) : 0;

@@ -517,6 +517,12 @@ export default function CampaignsPage() {
                             const ai = getAdsetInsight(adset.adset_id);
                             const adsInAdset = campaign.ads.filter((ad) => ad.adset_id === adset.adset_id);
                             const isAdsetExpanded = expandedAdset === adset.adset_id;
+                            const leadsInAdset = campaign.leads.filter(
+                              (l) => l.adset_name === adset.adset_name
+                            );
+                            const qualifiedInAdset = leadsInAdset.filter((l) =>
+                              isQualifiedIncome(l.monthly_income)
+                            ).length;
                             const leadsCount = ai?.leads ?? 0;
                             const spend = ai ? parseFloat(ai.spend || "0") : 0;
                             const cpl = ai?.cost_per_lead ?? (leadsCount > 0 ? spend / leadsCount : 0);
@@ -551,6 +557,11 @@ export default function CampaignsPage() {
                                             ? "Pausado"
                                             : adset.status || "N/A"}
                                         </Badge>
+                                        {qualifiedInAdset > 0 && (
+                                          <Badge variant="gold">
+                                            {qualifiedInAdset} qualif. (30k+)
+                                          </Badge>
+                                        )}
                                       </div>
                                       <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-navy-50">
                                         <span>{adsInAdset.length} anúncio(s)</span>
@@ -674,28 +685,75 @@ export default function CampaignsPage() {
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Anúncio</th>
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Tipo</th>
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Status</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Leads</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Qualif. 30k+</th>
                                             </tr>
                                           </thead>
                                           <tbody>
-                                            {adsInAdset.map((ad) => (
-                                              <tr key={ad.id} className="border-b border-gray-50">
-                                                <td className="px-3 py-2 text-navy-dark font-medium">
-                                                  {ad.ad_name || "N/A"}
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                  <Badge variant={ad.creative_type === "VIDEO" ? "info" : "default"}>
-                                                    {ad.creative_type || "N/A"}
-                                                  </Badge>
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                  <Badge variant={ad.status === "ACTIVE" ? "success" : "default"}>
-                                                    {ad.status || "N/A"}
-                                                  </Badge>
-                                                </td>
-                                              </tr>
-                                            ))}
+                                            {adsInAdset.map((ad) => {
+                                              const leadsInAd = leadsInAdset.filter(
+                                                (l) => l.ad_name === ad.ad_name
+                                              );
+                                              const qualifiedInAd = leadsInAd.filter((l) =>
+                                                isQualifiedIncome(l.monthly_income)
+                                              ).length;
+                                              return (
+                                                <tr key={ad.id} className="border-b border-gray-50">
+                                                  <td className="px-3 py-2 text-navy-dark font-medium">
+                                                    {ad.ad_name || "N/A"}
+                                                  </td>
+                                                  <td className="px-3 py-2">
+                                                    <Badge variant={ad.creative_type === "VIDEO" ? "info" : "default"}>
+                                                      {ad.creative_type || "N/A"}
+                                                    </Badge>
+                                                  </td>
+                                                  <td className="px-3 py-2">
+                                                    <Badge variant={ad.status === "ACTIVE" ? "success" : "default"}>
+                                                      {ad.status || "N/A"}
+                                                    </Badge>
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-navy-70">
+                                                    {leadsInAd.length}
+                                                  </td>
+                                                  <td className={`px-3 py-2 text-right font-bold ${qualifiedInAd > 0 ? "text-success" : "text-navy-30"}`}>
+                                                    {qualifiedInAd}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
                                           </tbody>
                                         </table>
+
+                                        {qualifiedInAdset > 0 && (
+                                          <div className="mt-3">
+                                            <p className="text-xs font-semibold text-navy-70 mb-2">
+                                              Leads qualificados (30k+) neste conjunto
+                                            </p>
+                                            <div className="space-y-1">
+                                              {leadsInAdset
+                                                .filter((l) => isQualifiedIncome(l.monthly_income))
+                                                .map((l) => (
+                                                  <div
+                                                    key={l.id}
+                                                    className="flex items-center justify-between text-xs bg-success/5 px-3 py-1.5 rounded"
+                                                  >
+                                                    <a
+                                                      href={`/admin/leads/${l.id}`}
+                                                      className="text-navy-dark font-medium hover:text-gold"
+                                                    >
+                                                      {l.full_name}
+                                                    </a>
+                                                    <span className="text-success font-semibold">
+                                                      {l.monthly_income}
+                                                    </span>
+                                                    <span className="text-navy-50 truncate max-w-[200px]">
+                                                      {l.ad_name || "—"}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                            </div>
+                                          </div>
+                                        )}
                                       )}
                                     </div>
                                   </div>
