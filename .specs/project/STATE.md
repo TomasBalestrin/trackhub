@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** F1 (dedup Pixel/CAPI) implementada; deploy + verificação pós-deploy pendentes.
+**Current Work:** F1 + F2 implementadas; deploy manual F1 + teste pós-deploy pendentes.
 
 ---
 
@@ -77,7 +77,7 @@ _(a popular conforme o trabalho avança)_
 - [x] ~~Q4: Segregar `WEBHOOK_SECRET`~~ — server OK; ops pendente (`.specs/quick/004-split-webhook-secret/`)
 - [ ] **Ops (Q4):** gerar `WEBHOOK_SECRET` aleatório, setar em Vercel, atualizar 3 Apps Scripts, rotacionar também `CRON_SECRET` (está em curl do README)
 - [x] ~~F1: Dedup `event_id` Pixel↔CAPI — código e migration prontos~~ (`.specs/features/f1-dedup-pixel-capi/`). **Deploy manual pendente:** inspecionar duplicatas, rodar migration, validar pós-deploy.
-- [ ] F2: Zod schemas para respostas Meta Marketing API (CONCERNS C10)
+- [x] ~~F2: Zod schemas em `fetchCampaigns`~~ (`.specs/features/f2-zod-meta-responses/`). Insights route fica para entrega futura.
 
 ---
 

@@ -1,3 +1,10 @@
+import {
+  AdListResponse,
+  AdsetListResponse,
+  CampaignListResponse,
+  parseMetaList,
+} from "./schemas";
+
 interface MetaAdData {
   campaign_id: string;
   campaign_name: string;
@@ -11,29 +18,37 @@ interface MetaAdData {
   objective: string | null;
 }
 
+const META_API = "https://graph.facebook.com/v21.0";
+
+async function fetchJson(url: string): Promise<unknown> {
+  const res = await fetch(url);
+  return res.json();
+}
+
 export async function fetchCampaigns(accessToken: string, adAccountId: string): Promise<MetaAdData[]> {
   const results: MetaAdData[] = [];
 
-  const campaignsRes = await fetch(
-    `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=name,status,objective,daily_budget&limit=100&access_token=${accessToken}`
+  const campaignsRaw = await fetchJson(
+    `${META_API}/${adAccountId}/campaigns?fields=name,status,objective,daily_budget&limit=100&access_token=${accessToken}`
   );
-  const campaignsData = await campaignsRes.json();
+  const campaigns = parseMetaList(CampaignListResponse, campaignsRaw, `campaigns(${adAccountId})`);
 
-  if (!campaignsData.data) return results;
-
-  for (const campaign of campaignsData.data) {
-    const adsetsRes = await fetch(
-      `https://graph.facebook.com/v21.0/${campaign.id}/adsets?fields=name,status&limit=100&access_token=${accessToken}`
+  for (const campaign of campaigns) {
+    const adsetsRaw = await fetchJson(
+      `${META_API}/${campaign.id}/adsets?fields=name,status&limit=100&access_token=${accessToken}`
     );
-    const adsetsData = await adsetsRes.json();
+    const adsets = parseMetaList(AdsetListResponse, adsetsRaw, `adsets(${campaign.id})`);
 
-    for (const adset of adsetsData.data || []) {
-      const adsRes = await fetch(
-        `https://graph.facebook.com/v21.0/${adset.id}/ads?fields=name,status,creative{object_type}&limit=100&access_token=${accessToken}`
+    for (const adset of adsets) {
+      const adsRaw = await fetchJson(
+        `${META_API}/${adset.id}/ads?fields=name,status,creative{object_type}&limit=100&access_token=${accessToken}`
       );
-      const adsData = await adsRes.json();
+      const ads = parseMetaList(AdListResponse, adsRaw, `ads(${adset.id})`);
 
-      for (const ad of adsData.data || []) {
+      const dailyBudget =
+        campaign.daily_budget != null ? Number(campaign.daily_budget) / 100 : null;
+
+      for (const ad of ads) {
         results.push({
           campaign_id: campaign.id,
           campaign_name: campaign.name,
@@ -41,10 +56,10 @@ export async function fetchCampaigns(accessToken: string, adAccountId: string): 
           adset_name: adset.name,
           ad_id: ad.id,
           ad_name: ad.name,
-          creative_type: ad.creative?.object_type || null,
-          status: ad.status,
-          daily_budget: campaign.daily_budget ? Number(campaign.daily_budget) / 100 : null,
-          objective: campaign.objective || null,
+          creative_type: ad.creative?.object_type ?? null,
+          status: ad.status ?? "UNKNOWN",
+          daily_budget: Number.isFinite(dailyBudget) ? dailyBudget : null,
+          objective: campaign.objective ?? null,
         });
       }
     }
