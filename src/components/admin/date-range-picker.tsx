@@ -259,6 +259,7 @@ export function DateRangePicker({ value, onChange, className, align = "right" }:
                         ? "text-white/25"
                         : "text-white/85",
                       isToday && !isStart && !isEnd && "text-gold font-bold",
+                      isToday && "ring-1 ring-gold ring-inset",
                       isInRange && "bg-gold/20",
                       (isStart || isEnd) && "bg-gold text-navy-dark font-bold",
                       !isStart && !isEnd && "hover:bg-navy"

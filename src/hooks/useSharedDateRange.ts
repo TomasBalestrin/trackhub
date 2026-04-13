@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { presetToRange, type DateField, type DateRange } from "@/lib/date-range";
 
 const STORAGE_KEY = "admin.dateRange.v1";
@@ -25,15 +25,19 @@ function readStored(): DateRange | null {
  */
 export function useSharedDateRange(defaultField: DateField = "created_at") {
   const [range, setRange] = useState<DateRange>(() => presetToRange("last_30d", defaultField));
+  const hydratedRef = useRef(false);
 
   // Hidrata do localStorage no mount (evita mismatch SSR/CSR)
   useEffect(() => {
     const stored = readStored();
     if (stored) setRange(stored);
+    hydratedRef.current = true;
   }, []);
 
-  // Persiste a cada mudança
+  // Persiste a cada mudança — só depois de hidratar, para não sobrescrever
+  // o valor salvo com o default inicial.
   useEffect(() => {
+    if (!hydratedRef.current) return;
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(range));
