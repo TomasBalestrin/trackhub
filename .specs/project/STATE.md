@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** Fix Apps Script income/position + calendário em `/admin/leads` deployado. Pendente: replicar calendário nas outras 4 páginas admin; você colar novos Apps Scripts no Google.
+**Current Work:** Adset drill-down em `/admin/campaigns` deployado. Dados virão quando rate limit Meta baixar (próximo cron tick).
 
 ---
 
@@ -66,7 +66,12 @@
 
 ## Active Blockers
 
-_(nenhum no momento)_
+### B-001: Meta Ad Account rate limit (2026-04-13)
+
+**Discovered:** 2026-04-13 durante primeiro sync de adsets em prod
+**Impact:** `meta_adsets_cache` vazio; UI drill-down em `/admin/campaigns` mostra "Nenhum adset em cache" até o bloqueio cair
+**Workaround:** aguardar próximo Vercel Cron tick; é 1 por hora e Meta costuma liberar em 30min a algumas horas
+**Resolution:** Acompanhar próximos syncs. Se persistir, reduzir frequência do cron para 6-12h. Considerar exponential backoff com detecção de `error.code=17` em `fetchCampaigns`.
 
 ---
 
