@@ -246,7 +246,7 @@ export default function CampaignsPage() {
       const data = await res.json();
       if (data.success) {
         setSyncResult(
-          `Sincronizado: ${data.ads_upserted}/${data.ads_total} anúncios · ${data.adsets_upserted} adsets`
+          `Sincronizado: ${data.ads_upserted}/${data.ads_total} anúncios · ${data.adsets_upserted}/${data.adsets_total} adsets`
         );
         loadData();
       } else {

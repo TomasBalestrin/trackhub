@@ -1,7 +1,6 @@
 import {
   AdListResponse,
   AdsetDetailListResponse,
-  AdsetListResponse,
   CampaignListResponse,
   parseMetaList,
   type AdsetDetailItem,
@@ -145,35 +144,85 @@ export async function fetchAdsets(accessToken: string, campaignId: string): Prom
   }));
 }
 
-export async function fetchCampaigns(accessToken: string, adAccountId: string): Promise<MetaAdData[]> {
-  const results: MetaAdData[] = [];
+/**
+ * Busca a hierarquia completa de uma conta Meta Ads em uma única passada:
+ * campanhas → adsets (com metadata detalhado) → ads.
+ *
+ * Retorna:
+ * - ads: 1 linha por anúncio (shape esperado por meta_campaigns_cache)
+ * - adsets: 1 linha por adset com budget/bid/targeting (meta_adsets_cache)
+ *
+ * Cada chamada à Graph API é tolerante a falha: se /adsets ou /ads de uma
+ * campanha/adset falhar (rate limit, permissão), aquele subtree fica vazio
+ * mas o resto continua. Evita perder sync por 1 bloqueio.
+ */
+export async function fetchCampaigns(
+  accessToken: string,
+  adAccountId: string
+): Promise<{ ads: MetaAdData[]; adsets: MetaAdsetRow[] }> {
+  const ads: MetaAdData[] = [];
+  const adsetsOut: MetaAdsetRow[] = [];
 
   const campaignsRaw = await fetchJson(
     `${META_API}/${adAccountId}/campaigns?fields=name,status,objective,daily_budget&limit=100&access_token=${accessToken}`
   );
   const campaigns = parseMetaList(CampaignListResponse, campaignsRaw, `campaigns(${adAccountId})`);
 
+  const adsetDetailFields = [
+    "name",
+    "status",
+    "campaign_id",
+    "daily_budget",
+    "lifetime_budget",
+    "bid_strategy",
+    "optimization_goal",
+    "billing_event",
+    "targeting",
+    "start_time",
+    "end_time",
+  ].join(",");
+
   for (const campaign of campaigns) {
     const adsetsRaw = await fetchJson(
-      `${META_API}/${campaign.id}/adsets?fields=name,status&limit=100&access_token=${accessToken}`
+      `${META_API}/${campaign.id}/adsets?fields=${adsetDetailFields}&limit=100&access_token=${accessToken}`
     );
-    const adsets = parseMetaList(AdsetListResponse, adsetsRaw, `adsets(${campaign.id})`);
+    const adsetsDetail = parseMetaList(
+      AdsetDetailListResponse,
+      adsetsRaw,
+      `adsets_detail(${campaign.id})`
+    );
 
-    for (const adset of adsets) {
+    const dailyBudget =
+      campaign.daily_budget != null ? Number(campaign.daily_budget) / 100 : null;
+
+    for (const a of adsetsDetail) {
+      adsetsOut.push({
+        adset_id: a.id,
+        adset_name: a.name,
+        campaign_id: campaign.id,
+        status: a.status ?? null,
+        daily_budget: centsToReais(a.daily_budget ?? null),
+        lifetime_budget: centsToReais(a.lifetime_budget ?? null),
+        bid_strategy: a.bid_strategy ?? null,
+        optimization_goal: a.optimization_goal ?? null,
+        billing_event: a.billing_event ?? null,
+        targeting: summarizeTargeting(a.targeting),
+        start_time: a.start_time ?? null,
+        end_time: a.end_time ?? null,
+        raw: a,
+      });
+
       const adsRaw = await fetchJson(
-        `${META_API}/${adset.id}/ads?fields=name,status,creative{object_type}&limit=100&access_token=${accessToken}`
+        `${META_API}/${a.id}/ads?fields=name,status,creative{object_type}&limit=100&access_token=${accessToken}`
       );
-      const ads = parseMetaList(AdListResponse, adsRaw, `ads(${adset.id})`);
+      const adList = parseMetaList(AdListResponse, adsRaw, `ads(${a.id})`);
 
-      const dailyBudget =
-        campaign.daily_budget != null ? Number(campaign.daily_budget) / 100 : null;
-
-      for (const ad of ads) {
-        results.push({
+      for (const ad of adList) {
+        ads.push({
           campaign_id: campaign.id,
           campaign_name: campaign.name,
-          adset_id: adset.id,
-          adset_name: adset.name,
+          adset_id: a.id,
+          adset_name: a.name,
           ad_id: ad.id,
           ad_name: ad.name,
           creative_type: ad.creative?.object_type ?? null,
@@ -185,5 +234,5 @@ export async function fetchCampaigns(accessToken: string, adAccountId: string): 
     }
   }
 
-  return results;
+  return { ads, adsets: adsetsOut };
 }
