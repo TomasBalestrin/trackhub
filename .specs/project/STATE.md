@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** Adset drill-down em `/admin/campaigns` deployado. Dados virão quando rate limit Meta baixar (próximo cron tick).
+**Current Work:** Q005 deployada (a37b24a) — fix de contrato `/api/admin/insights` em ads/dashboard + drill-down de qualificados (>30k) por adset/ad em `/admin/campaigns`. Adset metadata ainda depende de cron passar pelo rate limit Meta (B-001).
 
 ---
 
@@ -84,6 +84,13 @@
 **Solution:** Para tabelas pequenas (~milhares), usar `CREATE INDEX` regular — lock de escrita é desprezível. Para tabelas grandes, aplicar índice fora do migration system (psql direto ou Supabase Studio SQL).
 **Prevents:** Deploy quebrado por incompatibilidade silenciosa entre PostgreSQL e Supabase migration runner.
 
+### L-005: Contrato `/api/admin/insights` mudou para `{ data, summary }` e quebrou pages silenciosamente (2026-04-13)
+
+**Context:** Funil de Conversão em `/admin/ads` mostrava 0 em tudo; KPIs do dashboard zerados.
+**Problem:** A rota foi refatorada para retornar `{ data: [...], summary: { total_spend, total_impressions, total_leads, avg_ctr, avg_cost_per_lead, ... } }`, mas `src/app/admin/ads/page.tsx` ainda lia `overviewData.spend/actions` direto, e `src/app/admin/page.tsx` lia `summary.spend/leads` (chaves antigas inexistentes). Sem TypeScript end-to-end (a route retorna `NextResponse.json` sem tipo compartilhado), nada quebrou no build.
+**Solution:** Q005 — desempacotar `data[0]` para overview, `data` para daily/campaigns; usar chaves `total_*`/`avg_*` no dashboard com fallback.
+**Prevents:** Definir um tipo compartilhado (`InsightsResponse`) em `src/types/` e importá-lo tanto na route quanto nas pages elimina esse drift na próxima refatoração. TODO futuro.
+
 ### L-002: Vercel valida secrets em env vars quando há crons em vercel.json (2026-04-13)
 
 **Context:** F1 deploy quebrou logo após adicionar `vercel.json` com cron declarativo
@@ -101,6 +108,7 @@
 | 002 | Consolidar `extractHighestIncome` em 5 arquivos (CONCERNS C3) | 2026-04-13 | pending | ✅ Done |
 | 003 | Criar `vercel.json` com cron sync-campaigns (CONCERNS C13) | 2026-04-13 | pending | ✅ Done |
 | 004 | Segregar `WEBHOOK_SECRET` de `CRON_SECRET` com fallback (CONCERNS C6) | 2026-04-13 | pending | ✅ Done (ops pendente) |
+| 005 | Fix contrato `/api/admin/insights` + drill-down qualificados por adset/ad | 2026-04-13 | a37b24a | ✅ Done |
 
 ---
 
