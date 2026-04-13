@@ -13,8 +13,11 @@
 --   GROUP BY event_id
 --   HAVING COUNT(*) > 1;
 --
--- CONCURRENTLY evita lock de escrita na tabela durante a criação do índice
--- (importante em produção com tráfego contínuo).
+-- Nota: originalmente planejado com CONCURRENTLY, mas Supabase aplica
+-- migrations dentro de transação e CREATE INDEX CONCURRENTLY não pode rodar
+-- em tx block. Com a tabela em ~1.2k rows o lock de escrita é desprezível
+-- (milissegundos). Se a tabela crescer muito antes de re-rodar essa lógica,
+-- considerar aplicar via `supabase db query` fora da migration system.
 
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS tracking_events_event_id_key
+CREATE UNIQUE INDEX IF NOT EXISTS tracking_events_event_id_key
   ON public.tracking_events (event_id);
