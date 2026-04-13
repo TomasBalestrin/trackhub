@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fetchCampaigns } from "@/lib/meta/marketing-api";
+import { log } from "@/lib/log";
 
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       upserted,
     });
   } catch (error) {
-    console.error("Campaign sync error:", error);
+    log.error({ err: error, route: "cron/sync-campaigns" }, "campaign sync failed");
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }

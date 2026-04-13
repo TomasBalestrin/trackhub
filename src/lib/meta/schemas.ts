@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { log } from "@/lib/log";
 
 // Zod schemas para validar respostas do Meta Graph API v21.0.
 // Se o shape mudar (breaking change silencioso do Meta), parse falha em vez
@@ -54,7 +55,10 @@ export function parseMetaList<T>(
 ): T[] {
   const result = schema.safeParse(raw);
   if (!result.success) {
-    console.warn(`[meta/schemas] ${context}: resposta fora do schema — ignorada.`, result.error.issues.slice(0, 3));
+    log.warn(
+      { context, issues: result.error.issues.slice(0, 3) },
+      "meta response off-schema, ignored"
+    );
     return [];
   }
   return result.data.data;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { log } from "@/lib/log";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 const MAX_RESULTS = 500;
@@ -249,7 +250,7 @@ export async function GET(request: NextRequest) {
       summary,
     });
   } catch (error) {
-    console.error("[Admin Insights API] Error:", error);
+    log.error({ err: error, route: "/api/admin/insights" }, "insights handler failed");
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }

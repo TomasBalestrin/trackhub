@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendCAPIEvent } from "@/lib/meta/capi";
+import { log } from "@/lib/log";
 
 // Allow CORS for external sites using tracker.js
 const CORS_HEADERS = {
@@ -89,11 +90,11 @@ export async function POST(request: NextRequest) {
         fbc,
         fbp,
       },
-    }).catch((err) => console.error("CAPI tracking error:", err));
+    }).catch((err) => log.error({ err, route: "/api/tracking", phase: "capi" }, "CAPI tracking failed"));
 
     return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
   } catch (error) {
-    console.error("Tracking API error:", error);
+    log.error({ err: error, route: "/api/tracking" }, "tracking handler unexpected error");
     return NextResponse.json({ error: "Internal error" }, { status: 500, headers: CORS_HEADERS });
   }
 }

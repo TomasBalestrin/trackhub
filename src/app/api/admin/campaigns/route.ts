@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { log } from "@/lib/log";
 
 export async function GET() {
   const supabase = createServiceClient();
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, total: campaigns.length, upserted });
   } catch (error) {
-    console.error("Campaign sync error:", error);
+    log.error({ err: error, route: "admin/campaigns" }, "campaign sync failed");
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }

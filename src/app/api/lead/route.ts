@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { leadFormSchema } from "@/lib/lead/validation";
 import { calculateQualificationScore } from "@/lib/lead/qualification";
 import { sendCAPIEvent } from "@/lib/meta/capi";
+import { log } from "@/lib/log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("Lead insert error:", insertError);
+      log.error({ err: insertError, route: "/api/lead", phase: "insert" }, "lead insert failed");
       return NextResponse.json(
         { success: false, error: "Erro ao salvar dados. Tente novamente." },
         { status: 500 }
@@ -127,14 +128,14 @@ export async function POST(request: NextRequest) {
           content_category: "lead_capture",
           qualification_score: qualificationScore,
         },
-      }).catch((err) => console.error("CAPI Lead error:", err));
+      }).catch((err) => log.error({ err, route: "/api/lead", phase: "capi" }, "CAPI Lead failed"));
     } else {
-      console.warn(`[/api/lead] lead ${lead.id} sem event_id_lead — CAPI não disparado`);
+      log.warn({ lead_id: lead.id, route: "/api/lead" }, "lead without event_id_lead, CAPI skipped");
     }
 
     return NextResponse.json({ success: true, leadId: lead.id });
   } catch (error) {
-    console.error("Lead API error:", error);
+    log.error({ err: error, route: "/api/lead" }, "lead handler unexpected error");
     return NextResponse.json(
       { success: false, error: "Erro interno. Tente novamente." },
       { status: 500 }

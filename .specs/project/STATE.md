@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** F3 (Vitest + 52 testes críticos) implementado. Marco 2 iniciado.
+**Current Work:** F3 + F4 implementados. Marco 2 quase completo (falta F5 rate limit).
 
 ---
 
@@ -91,6 +91,7 @@ _(nenhum no momento)_
 - [x] ~~F1: Dedup `event_id` Pixel↔CAPI — DEPLOYADA EM PROD~~. Zero duplicatas pré-existentes (1217 rows escaneadas). UNIQUE INDEX criado, smoke test confirmou dedup (id duplicado POSTado → 1 row no DB). Validação Meta Events Manager pendente em uso real.
 - [x] ~~F2: Zod schemas em `fetchCampaigns`~~ (`.specs/features/f2-zod-meta-responses/`). Insights route fica para entrega futura.
 - [x] ~~F3: Vitest + 52 testes em qualification/validation/capi~~ (`.specs/features/f3-vitest-critical-tests/`). Cobertura em marketing-api/tracking/integration fica para iteração futura.
+- [x] ~~F4: Logger pino estruturado~~ (`.specs/features/f4-pino-logger/`). Todas as rotas server-side migradas; deploy + verificação Vercel Logs pendentes.
 
 ---
 

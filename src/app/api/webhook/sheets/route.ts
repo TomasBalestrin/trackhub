@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { calculateQualificationScore } from "@/lib/lead/qualification";
+import { log } from "@/lib/log";
 
 /**
  * Webhook para receber leads do Google Sheets (via Google Apps Script)
@@ -92,7 +93,18 @@ export async function POST(request: NextRequest) {
         } catch { /* invalid URL, ignore */ }
       }
 
-      console.log(`[webhook/sheets] Lead ${emailNormalized}: tracking_cache ${hasCachedData ? "HIT" : "MISS"}${hasCachedData ? ` (keys: ${Object.keys(trackData).filter(k => trackData[k]).join(", ")})` : ""}${Object.keys(urlUtms).length > 0 ? ` (url_fallback: ${Object.keys(urlUtms).join(", ")})` : ""}`);
+      log.info(
+        {
+          email: emailNormalized,
+          tracking_cache: hasCachedData ? "hit" : "miss",
+          cache_keys: hasCachedData
+            ? Object.keys(trackData).filter((k) => trackData[k])
+            : [],
+          url_fallback_keys: Object.keys(urlUtms),
+          route: "/api/webhook/sheets",
+        },
+        "lead ingested"
+      );
 
       // Resolve UTM values (lead data > cache > url fallback > null)
       const utmSource = lead.utm_source || trackData.utm_source || urlUtms.utm_source || null;
@@ -223,7 +235,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ results, total: leads.length });
   } catch (error) {
-    console.error("Webhook sheets error:", error);
+    log.error({ err: error, route: "/api/webhook/sheets" }, "webhook sheets failed");
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

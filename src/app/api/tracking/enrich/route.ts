@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { log } from "@/lib/log";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
   } catch (error) {
-    console.error("Tracking enrich error:", error);
+    log.error({ err: error, route: "/api/tracking/enrich" }, "tracking enrich failed");
     return NextResponse.json(
       { error: "Internal error" },
       { status: 500, headers: CORS_HEADERS }
