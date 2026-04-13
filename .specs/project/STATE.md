@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-13
-**Current Work:** F3 + F4 + F6 em prod (F5 adiado). Marco 2 + parte do 3.
+**Current Work:** Fix crítico de qualificação (piso de renda) deployado + backfill de 42 leads. Próximo: calendários nos menus admin.
 
 ---
 
@@ -20,6 +20,26 @@
 **Reason:** Brownfield real, stack definida, produção ativa — exercita todas as fases do framework.
 **Trade-off:** Adiar benefícios em outros projetos até validar aqui.
 **Impact:** Aprendizado do piloto vira base para adotar nos demais.
+
+### AD-006: Qualificação por PISO de renda, não TETO (2026-04-13)
+
+**Decision:** `isQualifiedIncome(income)` usa `extractLowestIncome(...) >= 30_000` como regra única. Score também recomputado pelo piso.
+**Reason:** Stakeholder (usuário) confirmou: "apenas acima de 30k; 15-30k não se enquadra". O antigo `extractHighestIncome(...) >= 30_000` falsamente qualificava a banda 15-30k porque o teto batia 30k.
+**Trade-off:** Semântica passa a ser conservadora (lead declara X-Y, assumimos que ganha pelo menos X). Faz-se a escolha mais alinhada ao filtro de stakeholder: melhor subestimar do que superestimar qualificação.
+**Impact:** 42 leads tiveram score corrigido via backfill. Dashboard + contagens de qualificados em todas as 5 páginas admin agora exibem números verdadeiros. Constante `QUALIFIED_INCOME_FLOOR` em `src/lib/lead/qualification.ts` é o único lugar a mudar se o threshold for ajustado.
+
+### L-003: Dados antigos de `qualification_score` inconsistentes (2026-04-13)
+
+**Context:** Backfill descobriu 42/81 leads com score divergente do calculado pela regra.
+**Problem:** Vários leads com score=0 mesmo tendo income/how_found/city/state preenchidos. Sugere regressão passada onde `calculateQualificationScore` não foi aplicado no ingest, ou migration inseriu defaults.
+**Solution:** Backfill one-off corrigiu tudo. A regra ativa hoje em `/api/webhook/sheets` + `/api/lead` aplica score corretamente em todo ingest novo.
+**Prevents:** Futuro drift — qualquer ajuste em bands/thresholds deve vir acompanhado de backfill.
+
+### L-004: Google Apps Script está poluindo `monthly_income` com sufixo de `position` (2026-04-13)
+
+**Context:** Backfill expôs valores como "Entre R$15.000 e R$30.000 Dono" em `monthly_income`.
+**Problem:** Indica que o Apps Script de webhook concatena campos de planilha que deveriam ir em `position` no campo errado.
+**Solution pendente:** Inspecionar `public/google-apps-script.js` + scripts gêmeos e o mapeamento de colunas da planilha. Abrir quick task separada.
 
 ### AD-005: Vercel Cron em vez de pg_cron para cleanup (2026-04-13)
 
@@ -95,6 +115,8 @@ _(nenhum no momento)_
 - [x] ~~Q3: Criar `vercel.json` com crons~~ (`.specs/quick/003-vercel-json-crons/`)
 - [x] ~~Q4: Segregar `WEBHOOK_SECRET`~~ — server OK; ops pendente (`.specs/quick/004-split-webhook-secret/`)
 - [ ] **Ops (Q4):** gerar `WEBHOOK_SECRET` aleatório, setar em Vercel, atualizar 3 Apps Scripts, rotacionar também `CRON_SECRET` (está em curl do README)
+- [ ] **Apps Script bug:** `monthly_income` vem concatenado com `position` ("Entre R$X Dono"). Investigar mapeamento de colunas em `public/google-apps-script.js` + gêmeos
+- [ ] **Calendários nos menus admin** — date range picker global + filtragem por período em dashboard, leads, ads, campaigns, ads/alertas
 - [x] ~~F1: Dedup `event_id` Pixel↔CAPI — DEPLOYADA EM PROD~~. Zero duplicatas pré-existentes (1217 rows escaneadas). UNIQUE INDEX criado, smoke test confirmou dedup (id duplicado POSTado → 1 row no DB). Validação Meta Events Manager pendente em uso real.
 - [x] ~~F2: Zod schemas em `fetchCampaigns`~~ (`.specs/features/f2-zod-meta-responses/`). Insights route fica para entrega futura.
 - [x] ~~F3: Vitest + 52 testes em qualification/validation/capi~~ (`.specs/features/f3-vitest-critical-tests/`). Cobertura em marketing-api/tracking/integration fica para iteração futura.

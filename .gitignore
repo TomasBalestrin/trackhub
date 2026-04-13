@@ -45,6 +45,9 @@ next-env.d.ts
 *.swp
 *.swo
 
+# Claude Code local config
+.claude/
+
 # supabase local
 supabase/.temp/
 supabase/.branches/
