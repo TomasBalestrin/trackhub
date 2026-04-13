@@ -73,6 +73,24 @@ interface AdsetInsightRow {
   cost_per_lead?: number;
 }
 
+interface AdInsightRow {
+  ad_id?: string;
+  ad_name?: string;
+  adset_name?: string;
+  campaign_name?: string;
+  impressions?: string;
+  clicks?: string;
+  spend?: string;
+  ctr?: string;
+  cpc?: string;
+  reach?: string;
+  leads?: number;
+  cost_per_lead?: number;
+  quality_ranking?: string;
+  engagement_rate_ranking?: string;
+  conversion_rate_ranking?: string;
+}
+
 interface AdsetRow {
   adset_id: string;
   adset_name: string;
@@ -115,6 +133,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<CampaignGroup[]>([]);
   const [adsets, setAdsets] = useState<AdsetRow[]>([]);
   const [adsetInsights, setAdsetInsights] = useState<AdsetInsightRow[]>([]);
+  const [adInsights, setAdInsights] = useState<AdInsightRow[]>([]);
   const [insights, setInsights] = useState<InsightsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -224,17 +243,21 @@ export default function CampaignsPage() {
 
   async function loadInsights() {
     try {
-      const [campaignRes, adsetRes] = await Promise.all([
+      const [campaignRes, adsetRes, adRes] = await Promise.all([
         fetch(`/api/admin/insights?type=campaigns&date_preset=${period}`),
         fetch(`/api/admin/insights?type=adsets&date_preset=${period}`),
+        fetch(`/api/admin/insights?type=ads&date_preset=${period}`),
       ]);
       const campaignData = await campaignRes.json();
       const adsetData = await adsetRes.json();
+      const adData = await adRes.json();
       setInsights(campaignData.data || []);
       setAdsetInsights(adsetData.data || []);
+      setAdInsights(adData.data || []);
     } catch {
       setInsights([]);
       setAdsetInsights([]);
+      setAdInsights([]);
     }
   }
 
@@ -264,6 +287,11 @@ export default function CampaignsPage() {
 
   function getAdsetInsight(adsetId: string): AdsetInsightRow | null {
     return adsetInsights.find((i) => i.adset_id === adsetId) || null;
+  }
+
+  function getAdInsight(adId: string | null): AdInsightRow | null {
+    if (!adId) return null;
+    return adInsights.find((i) => i.ad_id === adId) || null;
   }
 
   function getAdsetsForCampaign(campaignId: string): AdsetRow[] {
@@ -582,6 +610,12 @@ export default function CampaignsPage() {
                                         <p className="text-sm font-bold text-navy-dark">{leadsCount}</p>
                                       </div>
                                       <div>
+                                        <p className="text-xs text-navy-50">Qualif. 30k+</p>
+                                        <p className={`text-sm font-bold ${qualifiedInAdset > 0 ? "text-success" : "text-navy-30"}`}>
+                                          {qualifiedInAdset}
+                                        </p>
+                                      </div>
+                                      <div>
                                         <p className="text-xs text-navy-50">Gasto</p>
                                         <p className="text-sm font-bold text-navy-dark">
                                           {spend > 0 ? formatBRL(spend) : "—"}
@@ -679,13 +713,19 @@ export default function CampaignsPage() {
                                       {adsInAdset.length === 0 ? (
                                         <p className="text-xs text-navy-30">Nenhum anúncio nesse conjunto.</p>
                                       ) : (
+                                        <>
+                                        <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
                                           <thead>
                                             <tr className="bg-gray-50 border-b border-gray-200">
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Anúncio</th>
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Tipo</th>
                                               <th className="text-left px-3 py-2 font-medium text-navy-70">Status</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Impr.</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">Gasto</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">CTR</th>
                                               <th className="text-right px-3 py-2 font-medium text-navy-70">Leads</th>
+                                              <th className="text-right px-3 py-2 font-medium text-navy-70">CPL</th>
                                               <th className="text-right px-3 py-2 font-medium text-navy-70">Qualif. 30k+</th>
                                             </tr>
                                           </thead>
@@ -697,6 +737,12 @@ export default function CampaignsPage() {
                                               const qualifiedInAd = leadsInAd.filter((l) =>
                                                 isQualifiedIncome(l.monthly_income)
                                               ).length;
+                                              const adi = getAdInsight(ad.ad_id);
+                                              const adImpressions = adi ? parseInt(adi.impressions || "0", 10) : 0;
+                                              const adSpend = adi ? parseFloat(adi.spend || "0") : 0;
+                                              const adCtr = adi ? parseFloat(adi.ctr || "0") : 0;
+                                              const adLeadsApi = adi?.leads ?? 0;
+                                              const adCpl = adi?.cost_per_lead ?? (adLeadsApi > 0 ? adSpend / adLeadsApi : 0);
                                               return (
                                                 <tr key={ad.id} className="border-b border-gray-50">
                                                   <td className="px-3 py-2 text-navy-dark font-medium">
@@ -713,7 +759,24 @@ export default function CampaignsPage() {
                                                     </Badge>
                                                   </td>
                                                   <td className="px-3 py-2 text-right text-navy-70">
+                                                    {adImpressions > 0 ? adImpressions.toLocaleString("pt-BR") : "—"}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-navy-70">
+                                                    {adSpend > 0 ? formatBRL(adSpend) : "—"}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-navy-70">
+                                                    {adCtr > 0 ? `${adCtr.toFixed(2)}%` : "—"}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-navy-70">
                                                     {leadsInAd.length}
+                                                    {adLeadsApi > 0 && adLeadsApi !== leadsInAd.length && (
+                                                      <span className="text-xs text-navy-30 ml-1">
+                                                        ({adLeadsApi} api)
+                                                      </span>
+                                                    )}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-navy-70">
+                                                    {adCpl > 0 ? formatBRL(adCpl) : "—"}
                                                   </td>
                                                   <td className={`px-3 py-2 text-right font-bold ${qualifiedInAd > 0 ? "text-success" : "text-navy-30"}`}>
                                                     {qualifiedInAd}
@@ -723,6 +786,7 @@ export default function CampaignsPage() {
                                             })}
                                           </tbody>
                                         </table>
+                                        </div>
 
                                         {qualifiedInAdset > 0 && (
                                           <div className="mt-3">
@@ -754,6 +818,7 @@ export default function CampaignsPage() {
                                             </div>
                                           </div>
                                         )}
+                                        </>
                                       )}
                                     </div>
                                   </div>
